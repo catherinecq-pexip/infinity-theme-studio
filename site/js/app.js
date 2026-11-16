@@ -409,7 +409,8 @@ function renderMain({ resetScroll = false } = {}) {
   const scroll = resetScroll ? 0 : window.scrollY;
   previewUpdaters = [];
   const idx = STEPS.findIndex((s) => s.id === state.step);
-  main.replaceChildren(
+  // replaceChildren() would turn null into the text "null", so drop empty parts first.
+  main.replaceChildren(...[
     RENDERERS[state.step](),
     state.branding?.palette.length
       ? h("datalist", { id: "brand-palette" }, [state.branding.baseColor, ...state.branding.palette].filter(Boolean).map((c) => h("option", { value: c.toLowerCase() })))
@@ -417,7 +418,7 @@ function renderMain({ resetScroll = false } = {}) {
     h("div", { class: "nav-buttons" },
       idx > 0 ? h("button", { type: "button", class: "btn", onclick: () => go(STEPS[idx - 1].id) }, `← ${STEPS[idx - 1].title}`) : h("span"),
       idx < STEPS.length - 1 ? h("button", { type: "button", class: "btn primary", onclick: () => go(STEPS[idx + 1].id) }, `${STEPS[idx + 1].title} →`) : h("span")),
-  );
+  ].filter(Boolean));
   window.scrollTo(0, scroll);
   if (resetScroll) main.focus({ preventScroll: true });
 }
