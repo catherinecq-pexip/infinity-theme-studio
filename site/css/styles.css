@@ -101,12 +101,20 @@ input[type="number"] { max-width: 10rem; }
 .toggle { display: flex; align-items: center; gap: .4rem; font-weight: 600; margin: .5rem 0; cursor: pointer; }
 .toggle input { width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
 
-.color-control { display: flex; align-items: center; gap: .4rem; }
-.color-control input[type="color"] { width: 2.4rem; height: 2.1rem; padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; flex: none; }
-.color-control input[type="range"] { width: 4.5rem; accent-color: var(--accent); flex: none; }
-.color-control .alpha-label { font-size: .75rem; color: var(--muted); width: 2.4rem; flex: none; }
+.color-control { display: flex; flex-direction: column; gap: .35rem; }
+.color-row { display: flex; align-items: center; gap: .4rem; }
+/* The swatch shows the real colour (incl. transparency) over a checkerboard; the native picker sits invisibly on top. */
+.swatch { position: relative; flex: none; width: 2.4rem; height: 2.1rem; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; cursor: pointer; }
+.swatch:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.swatch-fill { position: absolute; inset: 0; }
+.swatch input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.color-control.unset .swatch-fill { background: repeating-linear-gradient(-45deg, transparent 0 5px, rgba(93, 102, 121, .25) 5px 6px) !important; }
 .color-control .color-text { font-family: ui-monospace, Consolas, monospace; font-size: .82rem; min-width: 0; }
-.color-control.unset input[type="color"], .color-control.unset input[type="range"], .color-control.unset .alpha-label { opacity: .35; }
+.alpha-row { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--muted); }
+.alpha-name { width: 2.4rem; flex: none; font-weight: 600; }
+.alpha-row input[type="range"] { flex: 1; min-width: 4rem; accent-color: var(--accent); }
+.alpha-label { width: 2.6rem; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.color-control.unset .alpha-row { opacity: .4; }
 
 /* Buttons */
 .btn { font: inherit; font-size: .9rem; font-weight: 600; padding: .45rem .9rem; border-radius: 7px; border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer; }

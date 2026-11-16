@@ -227,63 +227,81 @@ function numberField({ key, label, help }) {
 }
 
 /**
- * Colour picker with opacity. Writes 0xRRGGBB (opaque) or 0xAARRGGBB.
- * optional: shows a "clear" button that removes the setting.
+ * Colour control. Writes 0xRRGGBB (opaque) or 0xAARRGGBB (with transparency).
+ * - The swatch is the colour picker (click it) and shows the real colour,
+ *   including transparency, over a checkerboard.
+ * - alpha: show an "Opacity" slider. Use it where Infinity draws the colour over
+ *   video (indicators, message box). Without it, any existing alpha is kept.
+ * - optional: shows a "clear" button that removes the setting.
  */
-function colorControl(path, { optional = true, fallback = "#ffffff" } = {}) {
+function colorControl(path, { optional = true, alpha: withAlpha = false, fallback = "#ffffff", label = "Colour" } = {}) {
   const value = getPath(current(), path);
   const parsed = parseColor(value);
-  const picker = h("input", { type: "color", value: parsed?.rgb ?? fallback, "aria-label": "Colour" });
-  const alpha = h("input", { type: "range", min: 0, max: 100, value: String(Math.round(((parsed?.a ?? 255) / 255) * 100)), "aria-label": "Opacity", title: "Opacity" });
-  const alphaLabel = h("span", { class: "alpha-label" });
-  const text = h("input", { type: "text", class: "color-text", value: value ?? "", placeholder: optional ? "Infinity default" : "0xRRGGBB", spellcheck: "false" });
+  let rgb = parsed?.rgb ?? fallback;
+  let a = parsed?.a ?? 255;
+
+  const fill = h("span", { class: "swatch-fill" });
+  const picker = h("input", { type: "color", value: rgb, "aria-label": `${label}: choose colour` });
+  const swatch = h("span", { class: "swatch checker", title: "Click to choose a colour" }, fill, picker);
+  const text = h("input", {
+    type: "text", class: "color-text", value: value ?? "", spellcheck: "false",
+    placeholder: optional ? "Infinity default" : "0xRRGGBB", "aria-label": `${label}: colour code`,
+  });
+  const slider = h("input", { type: "range", min: 0, max: 100, "aria-label": `${label}: opacity` });
+  const pct = h("span", { class: "alpha-label" });
   const wrap = h("div", { class: "color-control" });
-  const setUnset = (unset) => wrap.classList.toggle("unset", unset);
-  const showAlpha = () => { alphaLabel.textContent = `${alpha.value}%`; };
-  const fromPicker = () => {
-    const code = formatColor(picker.value, Math.round((Number(alpha.value) / 100) * 255));
+
+  const paint = (unset) => {
+    wrap.classList.toggle("unset", unset);
+    fill.style.background = unset ? "transparent" : cssColor(formatColor(rgb, a));
+    slider.value = String(Math.round((a / 255) * 100));
+    pct.textContent = `${slider.value}%`;
+    slider.style.setProperty("--swatch", rgb);
+  };
+  const commit = () => {
+    const code = formatColor(rgb, a);
     text.value = code;
     text.classList.remove("invalid");
     state.edits.set(path, code);
-    setUnset(false);
-    showAlpha();
+    paint(false);
     changed();
   };
-  picker.addEventListener("input", fromPicker);
-  alpha.addEventListener("input", fromPicker);
+  picker.addEventListener("input", () => { rgb = picker.value; commit(); });
+  slider.addEventListener("input", () => { a = Math.round((Number(slider.value) / 100) * 255); commit(); });
   text.addEventListener("input", () => {
     const v = text.value.trim();
     if (v === "" && optional) {
       state.edits.remove(path);
-      setUnset(true);
       text.classList.remove("invalid");
+      paint(true);
       changed();
       return;
     }
     const c = parseColor(v);
     text.classList.toggle("invalid", !c);
     if (!c) return;
-    picker.value = c.rgb;
-    alpha.value = String(Math.round((c.a / 255) * 100));
-    showAlpha();
+    rgb = c.rgb;
+    a = c.a;
+    picker.value = rgb;
     state.edits.set(path, v);
-    setUnset(false);
+    paint(false);
     changed();
   });
-  showAlpha();
-  setUnset(!parsed);
-  wrap.append(picker, alpha, alphaLabel, text);
-  if (optional) {
-    wrap.append(h("button", {
-      type: "button", class: "icon-btn", title: "Use Infinity's default",
+  paint(!parsed);
+
+  wrap.append(h("div", { class: "color-row" }, swatch, text,
+    optional ? h("button", {
+      type: "button", class: "icon-btn", title: "Use Infinity's default", "aria-label": `${label}: use Infinity's default`,
       onclick: () => { text.value = ""; text.dispatchEvent(new Event("input")); },
-    }, "✕"));
+    }, "✕") : null));
+  if (withAlpha) {
+    wrap.append(h("label", { class: "alpha-row" }, h("span", { class: "alpha-name" }, "Opacity"), slider, pct));
   }
   return wrap;
 }
 
 function colorField(path, label, opts = {}) {
-  return field(label, path.join("."), colorControl(path, opts), opts.help);
+  return field(label, path.join("."), colorControl(path, { label, ...opts }), opts.help);
 }
 
 function section(title, help, ...content) {
@@ -568,9 +586,9 @@ SETTINGS_PANES.general = () => h("div", {},
   })))),
   section("Message box", "Colours of the message box shown over the video (for example, in-meeting notices).",
     h("div", { class: "fields" },
-      colorField(["message_box_config", "text_color"], "Text colour"),
-      colorField(["message_box_config", "background_color"], "Background colour"),
-      colorField(["message_box_config", "border_color"], "Border colour"))),
+      colorField(["message_box_config", "text_color"], "Text colour", { alpha: true }),
+      colorField(["message_box_config", "background_color"], "Background colour", { alpha: true }),
+      colorField(["message_box_config", "border_color"], "Border colour", { alpha: true }))),
 );
 
 // Indicators
@@ -630,9 +648,9 @@ function indicatorCard(ind) {
         },
       }), " Custom colours"),
     custom ? h("div", { class: "fields three" },
-      colorField([...colorPath, "background"], "Background", { optional: false }),
-      colorField([...colorPath, "border"], "Border", { optional: false }),
-      colorField([...colorPath, "text"], "Text", { optional: false })) : null,
+      colorField([...colorPath, "background"], "Background", { optional: false, alpha: true }),
+      colorField([...colorPath, "border"], "Border", { optional: false, alpha: true }),
+      colorField([...colorPath, "text"], "Text", { optional: false, alpha: true })) : null,
     custom ? h("label", { class: "toggle" },
       h("input", {
         type: "checkbox", checked: light,
@@ -643,9 +661,9 @@ function indicatorCard(ind) {
         },
       }), " Different colours in light mode") : null,
     custom && light ? h("div", { class: "fields three" },
-      colorField([...colorPath, "light_mode", "background"], "Light background", { optional: false }),
-      colorField([...colorPath, "light_mode", "border"], "Light border", { optional: false }),
-      colorField([...colorPath, "light_mode", "text"], "Light text", { optional: false })) : null,
+      colorField([...colorPath, "light_mode", "background"], "Light background", { optional: false, alpha: true }),
+      colorField([...colorPath, "light_mode", "border"], "Light border", { optional: false, alpha: true }),
+      colorField([...colorPath, "light_mode", "text"], "Light text", { optional: false, alpha: true })) : null,
   );
 }
 
