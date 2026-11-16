@@ -281,3 +281,5 @@ pre.code { background: #0f1729; color: #dbe4ff; padding: 1rem; border-radius: 8p
 /* Infinity version targeting */
 .chip.unsupported { text-decoration: line-through; opacity: .55; }
 .version-note { margin-top: .75rem; padding-top: .5rem; border-top: 1px dashed var(--border); }
+.small-btn { align-self: flex-start; font-size: .8rem; padding: .15rem .5rem; }
+textarea::placeholder { color: #9aa3b5; font-style: italic; }

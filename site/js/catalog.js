@@ -307,3 +307,39 @@ export const CAPABILITIES = [
   ["Voice prompts", "Replace any of the 44 spoken prompts. Upload any audio format or record in the browser."],
   ["Avatars", "Show avatars for audio-only and camera-off participants."],
 ];
+
+/**
+ * Infinity's default splash screen wording, from Pexip's theme_screen_defaults_v41.json
+ * (https://docs.pexip.com/files/v41/theme_screen_defaults_v41.json).
+ * {conference_id} and {conference_name} are filled in by Infinity.
+ */
+export const DEFAULT_LABEL_TEXT = {
+  welcome: "Welcome",
+  connecting: "Connecting...",
+  timeout: "Time exceeded",
+  waiting_for_host: "Waiting for the host...",
+  other_participants_audio_only: "Other participants\nare not sharing video",
+  insufficient_video_licenses: "Insufficient video licenses\nYou can still share content and audio",
+  invalid_license: "Invalid license",
+  capacity_exceeded: "Capacity\nexceeded",
+  insufficient_licenses: "Insufficient licenses",
+  please_enter_pin: "Please enter the PIN",
+  pin_correct: "Welcome",
+  invalid_pin: "Invalid PIN\nPlease try again",
+  enter_conference_id: "Enter conference ID",
+  conference_id_entry: "{conference_id}",
+  conference_id_invalid: "Conference ID invalid",
+  virtual_reception_connecting: "{conference_name}",
+  test_call_welcome_header: "Live Test",
+  test_call_welcome_text: "Let's test your video and\naudio. Count out loud\nfrom one to three...",
+  test_call_in_progress: "You will hear and see yourself with a two second delay",
+  test_call_complete: "If you have technical issues,\ncheck your settings or\ncontact your administrator",
+  no_presentation: "Waiting for presentation...",
+  stream_waiting: "Streaming will begin shortly...",
+  streaming_in_progress: "Your video is\nbeing streamed",
+  inlobby: "Welcome to the lobby,\nyour meeting host will admit you soon",
+  inlobby_status_unknown: "Call connecting...",
+  direct_media_escalate: "You are about to be transferred\ninto a multi-party conference",
+  direct_media_deescalate: "You are about to be transferred\ninto a one-to-one call",
+  host_left: "The host has left the conference.\nYour call will be disconnected shortly.",
+};

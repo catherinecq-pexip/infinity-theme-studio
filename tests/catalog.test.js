@@ -44,3 +44,8 @@ test("every voice prompt is described", () => {
 test("profile list matches the profiles folder", () => {
   assert.deepEqual(new Set(catalog.PROFILE_NAMES), new Set(loadProfiles().map((p) => p.name)));
 });
+
+test("Infinity's default wording is known for every splash screen label", () => {
+  assert.deepEqual(new Set(Object.keys(catalog.DEFAULT_LABEL_TEXT)), rules.DEFAULT_LABELS);
+  for (const [k, v] of Object.entries(catalog.DEFAULT_LABEL_TEXT)) assert.ok(typeof v === "string" && v.length, k);
+});

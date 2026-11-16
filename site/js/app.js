@@ -1121,13 +1121,35 @@ SETTINGS_PANES.keypad = () => {
 
 // Wording
 
+/** Splash screen label box showing Infinity's default wording, with an "Edit default" shortcut. */
+function labelField(key, label) {
+  const def = catalog.DEFAULT_LABEL_TEXT[key];
+  const el = textField(["splash_screens", "labels", key], label, {
+    multiline: true,
+    placeholder: def ?? "Default wording",
+    help: /\{\w+\}/.test(def ?? "") ? "Text in {braces} is filled in by Infinity (the meeting number or name). Keep it if you want it shown." : null,
+  });
+  if (!def) return el;
+  const ta = el.querySelector("textarea");
+  ta.rows = Math.max(2, def.split("\n").length);
+  const btn = h("button", {
+    type: "button", class: "btn subtle small-btn", title: "Copy Infinity's default wording into the box to edit it",
+    onclick: () => { ta.value = def; ta.dispatchEvent(new Event("input")); ta.focus(); },
+  }, "Edit default");
+  const sync = () => { btn.hidden = ta.value !== ""; };
+  ta.addEventListener("input", sync);
+  sync();
+  el.append(btn);
+  return el;
+}
+
 SETTINGS_PANES.wording = () => {
   const labels = current().splash_screens?.labels ?? {};
   const customKeys = Object.keys(labels).filter((k) => !rules.DEFAULT_LABELS.has(k));
   return h("div", {},
-    h("p", { class: "muted" }, "Change the text on the splash screens people see while joining, waiting, or when something goes wrong. Leave a box empty to keep the wording from your branding ZIP's layout, or Infinity's default. Press Enter for a new line."),
+    h("p", { class: "muted" }, "Change the text on the splash screens people see while joining, waiting, or when something goes wrong. Infinity's default wording is shown in grey; leave a box empty to keep it, or click “Edit default” to change it. Press Enter for a new line."),
     catalog.LABEL_GROUPS.map((g) => section(g.title, null, h("div", { class: "fields two" },
-      Object.entries(g.labels).map(([key, label]) => textField(["splash_screens", "labels", key], label, { multiline: true, placeholder: "Default wording" }))))),
+      Object.entries(g.labels).map(([key, label]) => labelField(key, label))))),
     customKeys.length ? section("Custom labels in your theme", "Extra labels defined by your branding ZIP's splash screen layouts.",
       h("div", { class: "fields two" }, customKeys.map((key) => textField(["splash_screens", "labels", key], key, { multiline: true })))) : null,
   );
