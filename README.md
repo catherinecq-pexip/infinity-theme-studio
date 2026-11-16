@@ -13,12 +13,15 @@ Infinity Theme Studio is a web portal that takes the ZIP from Pexip's branding p
 
 ## How to use it
 
-1. **Start.** Drop in your branding portal ZIP (or any existing theme ZIP), or start from scratch. Give the theme a name.
+1. **Start.** Drop in the ZIP from Pexip's branding portal, an existing Infinity theme ZIP, or start from scratch.
+   The branding portal ZIP is *web app branding* (`webapp3/branding/manifest.json`), not a theme. Theme Studio reuses its brand name (as the theme name), logo (as the watermark), background (as the splash screen background) and brand colours (one click colours all in-call indicators), and gives the ZIP back unchanged at the end.
 2. **Experience.** Optionally pick ready-made profiles: Standard, Secure, Events, Client-facing, Virtual Reception.
 3. **Settings.** Fine-tune indicators (wording, colours, visibility), the classification banner, the clock/timer, keypad (DTMF) codes and layouts, splash screen wording, avatars, watermarks and more. Every change shows a live preview.
 4. **Images.** Upload logos and backgrounds. Wrong sizes or formats are fixed automatically.
 5. **Voice prompts.** Replace any of the 44 spoken prompts. Upload any audio file or record with your microphone; it's converted to Infinity's format (16-bit mono 48 kHz WAV) automatically.
-6. **Review & download.** See any problems, then download the ZIP and upload it in the Infinity Administrator interface (**Services > Themes**).
+6. **Review & download.** See any problems, then download your packages:
+   - the **Infinity theme** ZIP: upload it in the Infinity Administrator interface (**Services > Themes**)
+   - the **web app branding** ZIP (only if you started from the branding portal): the same file, unchanged, to upload as web app branding
 
 Uploading a ZIP **replaces the whole theme** in Infinity, so always upload the complete, finished theme.
 
@@ -47,6 +50,7 @@ site/
   js/validate.js   # validation engine
   js/build.js      # theme finisher: merge profiles, settings and files
   js/package.js    # ZIP read/write (JSZip)
+  js/branding.js   # reads branding portal exports (web app branding)
   js/formats.js    # PNG/JPEG/WAV/SVG header checks
   js/audio.js      # audio conversion (Web Audio API)
   js/imaging.js    # image resize/convert

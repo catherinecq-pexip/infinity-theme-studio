@@ -6,7 +6,8 @@
 import * as rules from "./rules.js";
 import * as catalog from "./catalog.js";
 import { buildTheme, Edits, getPath } from "./build.js";
-import { loadConfig, loadZip, toZip, utf8 } from "./package.js";
+import { loadConfig, toZip, utf8 } from "./package.js";
+import { inspectZip, slug } from "./branding.js";
 import { customLayoutNames, describeJsonError, validate } from "./validate.js";
 import { AUDIO_SOURCE_EXTENSIONS, toInfinityWav, wavDuration } from "./audio.js";
 import { fitImage, objectUrl } from "./imaging.js";
@@ -21,7 +22,9 @@ const state = {
   settingsTab: "general",
   name: "my-theme",
   nameTouched: false,
-  base: null,             // theme loaded from the branding-portal ZIP
+  base: null,             // Infinity theme from the Start ZIP
+  branding: null,         // web app branding from the branding portal ZIP
+  fileSources: {},        // file name -> "branding" for files imported from it
   baseFileName: "",
   baseNotes: [],
   baseError: "",
@@ -241,7 +244,7 @@ function colorControl(path, { optional = true, alpha: withAlpha = false, fallbac
   let a = parsed?.a ?? 255;
 
   const fill = h("span", { class: "swatch-fill" });
-  const picker = h("input", { type: "color", value: rgb, "aria-label": `${label}: choose colour` });
+  const picker = h("input", { type: "color", value: rgb, list: state.branding?.palette.length ? "brand-palette" : null, "aria-label": `${label}: choose colour` });
   const swatch = h("span", { class: "swatch checker", title: "Click to choose a colour" }, fill, picker);
   const text = h("input", {
     type: "text", class: "color-text", value: value ?? "", spellcheck: "false",
@@ -327,7 +330,7 @@ const STEPS = [
 function stepBadge(id) {
   const files = Object.keys(build().theme.files);
   switch (id) {
-    case "start": return state.base ? "ZIP loaded" : "";
+    case "start": return state.branding ? (state.branding.brandName || "Branding loaded") : state.base ? "Theme ZIP loaded" : "";
     case "profiles": return state.profiles.length ? `${state.profiles.length} selected` : "";
     case "settings": return state.edits.count ? `${state.edits.count} changed` : "";
     case "images": {
@@ -390,6 +393,9 @@ function renderMain({ resetScroll = false } = {}) {
   const idx = STEPS.findIndex((s) => s.id === state.step);
   main.replaceChildren(
     RENDERERS[state.step](),
+    state.branding?.palette.length
+      ? h("datalist", { id: "brand-palette" }, [state.branding.baseColor, ...state.branding.palette].filter(Boolean).map((c) => h("option", { value: c.toLowerCase() })))
+      : null,
     h("div", { class: "nav-buttons" },
       idx > 0 ? h("button", { type: "button", class: "btn", onclick: () => go(STEPS[idx - 1].id) }, `← ${STEPS[idx - 1].title}`) : h("span"),
       idx < STEPS.length - 1 ? h("button", { type: "button", class: "btn primary", onclick: () => go(STEPS[idx + 1].id) }, `${STEPS[idx + 1].title} →`) : h("span")),
@@ -407,33 +413,109 @@ function issueList(issues) {
 
 // -- Step 1: Start ------------------------------------------------------------
 
-async function loadBaseZip(file) {
-  try {
-    const { theme, notes } = await loadZip(await readBytes(file), stem(file.name));
-    let error = "";
-    if (!(rules.THEMECONFIG in theme.files)) {
-      if ("manifest.json" in theme.files) {
-        error = "This looks like a web app branding package (manifest.json), not an Infinity theme. Theme Studio builds themes for the Infinity Conferencing Nodes.";
-      } else {
-        notes.push("No themeconfig.json found, so one will be created.");
-      }
-    } else {
-      try { loadConfig(theme); } catch (err) {
-        const text = new TextDecoder().decode(theme.files[rules.THEMECONFIG]);
-        error = `themeconfig.json in this ZIP can't be read (${describeJsonError(err, text)}). Its settings will be ignored and replaced.`;
-      }
+/** Forget the Start ZIP (theme and/or web app branding) and anything imported from it. */
+function clearStart() {
+  for (const [f, src] of Object.entries(state.fileSources)) {
+    if (src === "branding") delete state.files[f];
+  }
+  Object.assign(state, {
+    base: null, branding: null, baseFileName: "", baseNotes: [], baseError: "",
+    fileSources: {}, removedFiles: new Set(),
+  });
+}
+
+const slotFor = (file) => catalog.IMAGE_SLOTS.find((s) => s.file === file);
+
+/** Use the branding portal's logo and background as the theme's watermark and splash background. */
+async function importBranding(branding) {
+  const notes = [];
+  const imports = [
+    ["logo", "watermark_icon.png", "Logo"],
+    ["background", "background.jpg", "Background"],
+  ];
+  for (const [key, target, label] of imports) {
+    const img = branding.images[key];
+    if (!img) continue;
+    if (target in state.files) {
+      notes.push(`${label} not imported: you already added your own ${target}.`);
+      continue;
     }
-    state.base = theme;
+    const slot = slotFor(target);
+    try {
+      const bytes = needsFit(img.bytes, slot) ? await fitImage(img.bytes, img.name, slot.fit) : img.bytes;
+      setFile(target, bytes, "branding");
+      notes.push(`${label} → ${target} (${slot.fit.w}×${slot.fit.h})`);
+    } catch (err) {
+      notes.push(`${label} could not be converted (${err.message}). Add it in the Images step.`);
+    }
+  }
+  if (branding.images.jumbotron) notes.push("The jumbotron image is used by the web app only.");
+  return notes;
+}
+
+async function loadStartZip(file) {
+  try {
+    const bytes = await readBytes(file);
+    const { theme: found, branding } = await inspectZip(bytes, stem(file.name));
+    clearStart();
     state.baseFileName = file.name;
-    state.baseNotes = notes;
-    state.baseError = error;
-    state.removedFiles = new Set(); // files added in the portal are kept
-    if (!state.nameTouched) state.name = safeFileName(stem(file.name));
-    toast(`Loaded ${file.name} (${Object.keys(theme.files).length} files)`, "success");
+    if (found) {
+      const { theme, notes } = found;
+      if (!(rules.THEMECONFIG in theme.files)) {
+        notes.push("No themeconfig.json found, so one will be created.");
+      } else {
+        try { loadConfig(theme); } catch (err) {
+          const text = new TextDecoder().decode(theme.files[rules.THEMECONFIG]);
+          state.baseError = `themeconfig.json in this ZIP can't be read (${describeJsonError(err, text)}). Its settings will be ignored and replaced.`;
+        }
+      }
+      state.base = theme;
+      state.baseNotes.push(...notes);
+    }
+    if (branding) {
+      state.branding = { ...branding, fileName: file.name, bytes };
+      state.baseNotes.push(...await importBranding(branding));
+    }
+    if (!state.nameTouched) state.name = safeFileName(slug(branding?.brandName) || stem(file.name));
+    toast(branding ? `Loaded web app branding “${branding.brandName || file.name}”` : `Loaded ${file.name} (${Object.keys(found.theme.files).length} files)`, "success");
   } catch (err) {
     toast(err.message, "error");
   }
   changed({ rerender: true });
+}
+
+/** Give every in-call indicator the brand colour (solid border, slightly transparent background). */
+function applyBrandColour() {
+  const base = state.branding?.baseColor;
+  if (!base) return;
+  for (const type of rules.INDICATOR_TYPES) {
+    state.edits.replace(["indicator_color_config", type], {
+      background: formatColor(base, 0xcc),
+      border: formatColor(base, 0xff),
+      text: formatColor("#ffffff", 0xff),
+    });
+  }
+  toast(`Brand colour applied to ${rules.INDICATOR_TYPES.size} indicators`, "success");
+  changed({ rerender: true });
+}
+
+function brandColourButton() {
+  return state.branding?.baseColor
+    ? h("button", { type: "button", class: "btn", onclick: applyBrandColour },
+      h("span", { class: "dot", style: { background: state.branding.baseColor } }), " Apply brand colour to indicators")
+    : null;
+}
+
+function brandingSummary() {
+  const b = state.branding;
+  return h("div", { class: "brand-summary" },
+    b.images.logo ? h("span", { class: "brand-logo checker" }, thumb(b.images.logo.name, b.images.logo.bytes)) : null,
+    h("div", {},
+      h("div", { class: "muted small" }, "Web app branding from the branding portal"),
+      h("strong", {}, b.brandName || "(no brand name)"),
+      b.palette.length ? h("div", { class: "palette", title: "Brand colour palette" },
+        b.palette.map((c) => h("span", { class: "dot", style: { background: c }, title: c }))) : null,
+      b.plugins ? h("div", { class: "muted small" }, `Includes ${b.plugins} web app plugin(s); they stay in the web app package.`) : null));
 }
 
 function baseSummary() {
@@ -450,7 +532,7 @@ function baseSummary() {
 
 async function chooseBaseZip() {
   const [f] = await pickFiles({ accept: ".zip,application/zip" });
-  if (f) loadBaseZip(f);
+  if (f) loadStartZip(f);
 }
 
 RENDERERS.start = () => {
@@ -466,36 +548,35 @@ RENDERERS.start = () => {
       e.preventDefault();
       e.currentTarget.classList.remove("over");
       const f = e.dataTransfer.files[0];
-      if (f) loadBaseZip(f);
+      if (f) loadStartZip(f);
     },
   },
   h("div", { class: "dz-icon" }, "⬆"),
   h("strong", {}, "Drop your branding portal ZIP here"),
-  h("span", { class: "muted" }, "or click to choose a file. Any existing Infinity theme ZIP works too."));
+  h("span", { class: "muted" }, "or click to choose a file. An existing Infinity theme ZIP works too."));
 
   return h("div", {},
     h("div", { class: "hero" },
       h("h1", {}, "Build a Pexip Infinity theme"),
       h("p", { class: "lead" },
         "Themes control what people see and hear when they join a Pexip Infinity meeting from browsers, room systems and phones: splash screens, logos, in-call indicators, classification banners, clocks, keypad controls and voice prompts. ",
-        "Start from the ZIP made by Pexip's branding portal, add everything the portal doesn't cover, then download a theme that's ready to upload.")),
+        "Start from the ZIP made by Pexip's branding portal (which brands the web app). Theme Studio reuses its name, logo, background and colours for the theme, lets you add everything the portal doesn't cover, and gives you both packages ready to upload.")),
 
     section("1. Start from your branding", null,
-      state.base
+      state.base || state.branding
         ? h("div", { class: "loaded" },
-          h("div", {},
-            h("strong", {}, state.baseFileName),
-            h("div", { class: "muted" }, baseSummary()),
-            state.baseNotes.map((n) => h("div", { class: "note" }, n)),
-            state.baseError ? h("div", { class: "issue error" }, h("span", { class: "issue-msg" }, state.baseError)) : null),
+          h("div", { class: "loaded-body" },
+            h("div", { class: "muted small" }, state.baseFileName),
+            state.branding ? brandingSummary() : null,
+            state.base ? h("div", {}, h("strong", {}, "Infinity theme: "), h("span", { class: "muted" }, baseSummary())) : null,
+            state.baseNotes.length ? h("ul", { class: "list notes" }, state.baseNotes.map((n) => h("li", {}, n))) : null,
+            state.baseError ? h("div", { class: "issue error" }, h("span", { class: "issue-msg" }, state.baseError)) : null,
+            brandColourButton()),
           h("div", { class: "row" },
             h("button", { type: "button", class: "btn", onclick: chooseBaseZip }, "Choose another"),
             h("button", {
               type: "button", class: "btn subtle",
-              onclick: () => {
-                Object.assign(state, { base: null, baseFileName: "", baseNotes: [], baseError: "", removedFiles: new Set() });
-                changed({ rerender: true });
-              },
+              onclick: () => { clearStart(); changed({ rerender: true }); },
             }, "Start from scratch instead")))
         : h("div", {}, drop, h("p", { class: "muted small" }, "No branding ZIP yet? Just continue. You can build a theme from scratch and add images later."))),
 
@@ -669,6 +750,7 @@ function indicatorCard(ind) {
 
 SETTINGS_PANES.indicators = () => h("div", {},
   h("p", { class: "muted" }, "Indicators appear over the video to tell people what's happening in the meeting. Change their wording, colours (with transparency), or hide them."),
+  brandColourButton(),
   h("div", { class: "indicator-grid" }, catalog.INDICATORS.map(indicatorCard)));
 
 // Classification
@@ -1043,8 +1125,9 @@ SETTINGS_PANES.advanced = () => {
 function fileStatus(fname) {
   const inFinal = fname in build().theme.files;
   const fromBase = state.base && fname in state.base.files;
+  if (fname in state.files && state.fileSources[fname] === "branding") return "From web app branding";
   if (fname in state.files) return fromBase ? "Replaced" : "Added";
-  if (inFinal) return "From branding ZIP";
+  if (inFinal) return "From theme ZIP";
   if (fromBase && state.removedFiles.has(fname)) return "Removed";
   return "Infinity default";
 }
@@ -1053,18 +1136,22 @@ function fileIssues(fname) {
   return build().report.issues.filter((i) => i.file === fname);
 }
 
-function setFile(fname, bytes) {
+function setFile(fname, bytes, source = null) {
   state.files[fname] = bytes;
   state.removedFiles.delete(fname);
+  if (source) state.fileSources[fname] = source;
+  else delete state.fileSources[fname];
 }
 
 function removeFile(fname) {
   delete state.files[fname];
+  delete state.fileSources[fname];
   if (state.base && fname in state.base.files) state.removedFiles.add(fname);
 }
 
 function restoreFile(fname) {
   delete state.files[fname];
+  delete state.fileSources[fname];
   state.removedFiles.delete(fname);
 }
 
@@ -1121,6 +1208,14 @@ function imageSlotCard(slot) {
       h("p", { class: "muted" }, slot.help),
       h("p", { class: "small" }, h("code", {}, slot.file), " · ", slot.spec),
       issueList(issues),
+      bytes && rules.WATERMARK_FILES.has(slot.file) && current().disable_watermark_icon === true
+        ? h("div", { class: "notice" },
+          h("span", {}, "This logo won't be shown: the watermark is hidden by your current settings (", h("code", {}, "disable_watermark_icon"), ")."),
+          h("button", {
+            type: "button", class: "btn primary",
+            onclick: () => { state.edits.set(["disable_watermark_icon"], false); toast("Watermark logo switched on", "success"); changed({ rerender: true }); },
+          }, "Show my logo"))
+        : null,
       h("div", { class: "row" },
         h("button", {
           type: "button", class: "btn",
@@ -1304,21 +1399,29 @@ RENDERERS.voice = () => h("div", {},
 
 // -- Step 6: Review ----------------------------------------------------------------
 
+function saveBytes(bytes, filename) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+  const a = h("a", { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast(`Downloaded ${filename}`, "success");
+}
+
 async function download() {
   const { theme } = build();
   try {
-    const bytes = await toZip(theme);
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
-    const a = h("a", { href: url, download: `${safeFileName(theme.name)}.zip` });
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    saveBytes(await toZip(theme), `${safeFileName(theme.name)}.zip`);
     state.dirty = false;
-    toast(`Downloaded ${safeFileName(theme.name)}.zip`, "success");
   } catch (err) {
     toast(`Could not create the ZIP: ${err.message}`, "error");
   }
+}
+
+/** The branding portal ZIP, handed back unchanged for the web app. */
+function downloadBranding() {
+  saveBytes(state.branding.bytes, state.branding.fileName);
 }
 
 RENDERERS.review = () => {
@@ -1327,26 +1430,36 @@ RENDERERS.review = () => {
   const total = names.reduce((n, f) => n + theme.files[f].length, 0);
   const blocked = report.errors.length > 0 && !state.allowErrors;
   const sortedIssues = [...report.errors, ...report.warnings];
+  const both = Boolean(state.branding);
   return h("div", {},
     h("h1", {}, "Review & download"),
     h("section", { class: `card status ${report.errors.length ? "bad" : "good"}` },
       h("h2", {}, report.errors.length
         ? `${report.errors.length} problem${report.errors.length === 1 ? "" : "s"} to fix before uploading`
-        : "Your theme is ready"),
-      h("p", {}, `${names.length} files · ${fmtSize(total)}`, report.warnings.length ? ` · ${report.warnings.length} warning(s) worth a look` : ""),
+        : both ? "Your packages are ready" : "Your theme is ready"),
+      h("p", {}, `Infinity theme: ${names.length} files · ${fmtSize(total)}`, report.warnings.length ? ` · ${report.warnings.length} warning(s) worth a look` : ""),
+      both ? h("p", {}, `Web app branding: ${state.branding.fileName} · ${fmtSize(state.branding.bytes.length)} (your branding portal ZIP, unchanged)`) : null,
       h("div", { class: "row" },
-        h("button", { type: "button", class: "btn primary big", disabled: blocked, onclick: download }, `Download ${safeFileName(theme.name)}.zip`),
+        h("button", { type: "button", class: "btn primary big", disabled: blocked, onclick: download }, both ? "Download Infinity theme" : `Download ${safeFileName(theme.name)}.zip`),
+        both ? h("button", { type: "button", class: "btn big", onclick: downloadBranding }, "Download web app branding") : null,
         report.errors.length ? h("label", { class: "toggle" },
           h("input", { type: "checkbox", checked: state.allowErrors, onchange: (e) => { state.allowErrors = e.target.checked; renderMain(); } }),
           " Download anyway (Infinity may reject it)") : null)),
     sortedIssues.length ? section("Checks", "Errors mean Infinity will probably reject the theme or the setting won't work. Warnings are allowed but worth checking.", issueList(sortedIssues)) : null,
-    section("Upload it to Infinity", null,
+    section(both ? "Upload the Infinity theme" : "Upload it to Infinity",
+      both ? "The theme covers what Infinity itself shows and plays: splash screens, watermarks, indicators, banners and voice prompts, on room systems, phones and the web app." : null,
       h("ol", { class: "steps-list" },
         h("li", {}, "Sign in to the Pexip Infinity Administrator interface."),
         h("li", {}, "Go to ", h("strong", {}, "Services > Themes"), " and add a theme (or edit an existing one), give it a name, upload this ZIP and save."),
         h("li", {}, "Choose the theme on the meeting rooms (VMRs), Virtual Auditoriums or Virtual Receptions that should use it, or make it the default theme."),
         h("li", {}, "Changes reach the Conferencing Nodes in about a minute. Test on a non-production meeting room first.")),
       h("p", { class: "muted small" }, "Uploading a ZIP replaces the whole theme in Infinity, so always upload the complete theme. ", docsLink("Creating and applying themes", catalog.DOCS.creating))),
+    both ? section("Upload the web app branding", "Web app branding styles the Pexip web app itself: its logo, background, colours, plugins and brand name.",
+      h("ol", { class: "steps-list" },
+        h("li", {}, "In the Pexip Infinity Administrator interface, open the Web App settings and upload this ZIP as web app branding."),
+        h("li", {}, "Use that branding on the web app path people join from (for example ", h("code", {}, "/meet"), " or your own path)."),
+        h("li", {}, "Test by joining a non-production meeting room from that path.")),
+      h("p", { class: "muted small" }, "This is the same file the branding portal gave you. Theme Studio doesn't change it. To change the web app's look, edit it in the branding portal.")) : null,
     section("What was built", null, h("ul", { class: "list" }, log.map((l) => h("li", {}, l)))),
     section("Files", null, h("table", { class: "files" },
       h("thead", {}, h("tr", {}, h("th", {}, "File"), h("th", {}, "Size"))),
