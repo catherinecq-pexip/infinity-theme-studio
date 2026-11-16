@@ -1435,12 +1435,20 @@ function promptRow(prompt, description) {
   const recordingThis = state.recording?.file === prompt;
   const fromBase = state.base && prompt in state.base.files;
   const dur = bytes ? wavDuration(bytes) : null;
+  const def = catalog.DEFAULT_PROMPTS[prompt] ?? {};
+  const wording = def.silent
+    ? h("span", { class: "prompt-default muted" }, "Silent by default. Add audio to play something here.")
+    : def.text?.startsWith("(")
+      ? h("span", { class: "prompt-default muted" }, `Default: ${def.text.slice(1, -1)}`)
+      : def.text ? h("q", { class: "prompt-default", title: "What Infinity's default prompt says" }, def.text) : null;
   return h("div", { class: `prompt ${bytes ? "custom" : ""}` },
     h("div", { class: "prompt-text" },
       h("strong", {}, description),
+      wording,
+      def.only ? h("span", { class: "prompt-only" }, catalog.GATEWAY_ONLY[def.only]) : null,
       h("code", { class: "key" }, prompt),
       issueList(issues)),
-    h("span", { class: "prompt-status" }, status === "Infinity default" ? h("span", { class: "muted" }, "Default voice") : `${status}${dur ? ` · ${dur.toFixed(1)} s` : ""}`),
+    h("span", { class: "prompt-status" }, status === "Infinity default" ? h("span", { class: "muted" }, def.silent ? "Silent" : "Default voice") : `${status}${dur ? ` · ${dur.toFixed(1)} s` : ""}`),
     h("div", { class: "row" },
       bytes ? h("button", { type: "button", class: "icon-btn", title: "Play", "aria-label": `Play ${description}`, onclick: () => play(bytes) }, "▶") : null,
       h("button", {

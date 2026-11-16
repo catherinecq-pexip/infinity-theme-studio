@@ -343,3 +343,62 @@ export const DEFAULT_LABEL_TEXT = {
   direct_media_deescalate: "You are about to be transferred\ninto a one-to-one call",
   host_left: "The host has left the conference.\nYour call will be disconnected shortly.",
 };
+
+/**
+ * What Infinity's default voice prompts say, from Pexip's theme documentation (v42):
+ * https://docs.pexip.com/admin/themes_file_requirements.htm
+ * text: the spoken words (null when silent); silent: the default file is empty;
+ * only: prompts Infinity only plays to callers gatewayed into Google Meet and/or Microsoft Teams.
+ */
+export const DEFAULT_PROMPTS = {
+  "2sd-invalid-number-three-times-disconnect_48kHz_mono.wav": { text: "You have entered an invalid number three times. I will now disconnect the call." },
+  "2sd-not-entered-valid-number-disconnect-call_48kHz_mono.wav": { text: "You have not entered a valid number. I will now disconnect the call." },
+  "2sd-number-not-valid-try-again_48kHz_mono.wav": { text: "That number is not valid. Please try again." },
+  "2sd-number-pound-key_48kHz_mono.wav": { text: "Please enter the number you wish to connect to, followed by the pound key." },
+  "2sd-please-hold-connect-you_48kHz_mono.wav": { text: "Please hold while I try to connect you." },
+  "call_about_to_be_transferred.wav": { text: "Your call is about to be transferred." },
+  "call_about_to_transfer_to_main_room.wav": { text: "Your call is about to be transferred to the main room." },
+  "conf-ai_started_48kHz_mono.wav": { text: "This call is being processed by AI.", only: "google-meet" },
+  "conf-ai_stopped_48kHz_mono.wav": { text: "AI has stopped processing this call.", only: "google-meet" },
+  "conf-call-will-be-disconnected_48kHz_mono.wav": { text: "Your call will be disconnected." },
+  "conf-capacity_exceeded_48kHz_mono.wav": { text: "The conferencing system capacity has been exceeded." },
+  "conf-classification-changed_48kHz_mono.wav": { text: null, silent: true },
+  "conf-external-media-processing-start_48kHz_mono.wav": { text: "An external application is collecting media.", only: "google-meet" },
+  "conf-external-media-processing-stopped_48kHz_mono.wav": { text: "Media is no longer being collected by an external application.", only: "google-meet" },
+  "conf-getpin_48kHz_mono.wav": { text: "Please enter the conference PIN number." },
+  "conf-getpin_pound-key_48kHz_mono.wav": { text: "Please enter the conference PIN number, followed by the pound key." },
+  "conf-insufficient_licenses_48kHz_mono.wav": { text: "There are insufficient conferencing system licenses available." },
+  "conf-invalid_license_48kHz_mono.wav": { text: "The conferencing system license is invalid." },
+  "conf-invalidpin_48kHz_mono.wav": { text: "The PIN is invalid for this conference." },
+  "conf-leaderhasleft_48kHz_mono.wav": { text: "The Host has left the conference. The conference is about to end." },
+  "conf-live_captions_started_48kHz_mono.wav": { text: "Live captions are enabled. Your continued participation in this call will be considered as consent." },
+  "conf-live_captions_stopped_48kHz_mono.wav": { text: "Live captions are not in use." },
+  "conf-participant_entry_tone_48kHz_mono.wav": { text: null, silent: true },
+  "conf-participant_exit_tone_48kHz_mono.wav": { text: null, silent: true },
+  "conf-participant_is_in_lobby_48kHz_mono.wav": { text: "Welcome to the lobby. Please wait and your meeting host will admit you soon.", only: "teams" },
+  "conf-participant_locked_out_48Khz_mono.wav": { text: "(three knocks)" },
+  "conf-placeintoconf_48kHz_mono.wav": { text: "Welcome to the conference." },
+  "conf-public_streaming_started_48kHz_mono.wav": { text: "This call is being streamed publicly.", only: "google-meet" },
+  "conf-public_streaming_stopped_48kHz_mono.wav": { text: "Public streaming of this call has stopped.", only: "google-meet" },
+  "conf-recording_started_48kHz_mono.wav": { text: "This call is being recorded.", only: "google-meet-or-teams" },
+  "conf-recording_stopped_48kHz_mono.wav": { text: "Recording of this call has stopped.", only: "google-meet-or-teams" },
+  "conf-smart_notes_started_48kHz_mono.wav": { text: "This call is now taking notes." },
+  "conf-smart_notes_stopped_48kHz_mono.wav": { text: "This call is no longer taking notes." },
+  "conf-streaming_started_48kHz_mono.wav": { text: "This call is being streamed.", only: "google-meet" },
+  "conf-streaming_stopped_48kHz_mono.wav": { text: "Streaming of this call has stopped.", only: "google-meet" },
+  "conf-test_call_48kHz_mono.wav": { text: "Let's test your video and audio. Count out loud from one to three, now." },
+  "conf-test_call_audio_only_48kHz_mono.wav": { text: "Let's test your audio settings. Count out loud from one to three, now." },
+  "conf-test_call_disconnect_48kHz_mono.wav": { text: "If you have technical issues, check your settings or contact your administrator." },
+  "conf-transcribing_started_48kHz_mono.wav": { text: "This call is being transcribed.", only: "google-meet-or-teams" },
+  "conf-transcribing_stopped_48kHz_mono.wav": { text: "Transcribing of this call has stopped.", only: "google-meet-or-teams" },
+  "conf-waitforleader_48kHz_mono.wav": { text: "Waiting for the conference Host to join." },
+  "conf-waithostpin_48kHz_mono.wav": { text: "Waiting for the conference Host to join. If you are the conference Host, please enter the conference PIN number now." },
+  "conf-waithostpin_pound-key_48kHz_mono.wav": { text: "Waiting for the conference Host to join. If you are the conference Host, please enter the conference PIN number followed by the pound key." },
+  "conf-you_are_the_only_participant_48kHz_mono.wav": { text: "You are the only participant in the conference." },
+};
+
+export const GATEWAY_ONLY = {
+  "google-meet": "Only played to callers joining Google Meet through Infinity",
+  "teams": "Only played to callers joining Microsoft Teams through Infinity",
+  "google-meet-or-teams": "Only played to callers joining Google Meet or Microsoft Teams through Infinity",
+};

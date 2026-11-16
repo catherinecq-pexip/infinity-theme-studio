@@ -49,3 +49,11 @@ test("Infinity's default wording is known for every splash screen label", () => 
   assert.deepEqual(new Set(Object.keys(catalog.DEFAULT_LABEL_TEXT)), rules.DEFAULT_LABELS);
   for (const [k, v] of Object.entries(catalog.DEFAULT_LABEL_TEXT)) assert.ok(typeof v === "string" && v.length, k);
 });
+
+test("Infinity's default wording is known for every voice prompt", () => {
+  assert.deepEqual(new Set(Object.keys(catalog.DEFAULT_PROMPTS)), rules.BASE_AUDIO_FILES);
+  for (const [f, d] of Object.entries(catalog.DEFAULT_PROMPTS)) {
+    assert.ok(d.silent ? d.text === null : typeof d.text === "string" && d.text.length, f);
+    if (d.only) assert.ok(catalog.GATEWAY_ONLY[d.only], `${f}: ${d.only}`);
+  }
+});
