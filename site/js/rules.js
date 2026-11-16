@@ -63,6 +63,7 @@ export const COLOR_SETTINGS = new Set([
   "text_color",
   "avatar_in_mix_text_color",
   "avatar_in_mix_shape_color",
+  "no_main_video_bg", // used in Pexip's language themes (e.g. pexip_english_US); not in the theme docs
 ]);
 
 /** Structured settings (validated individually). */
@@ -272,6 +273,22 @@ export const CUSTOM_LAYOUT_PREFIX = "custom_layout_";
 export const CUSTOM_LAYOUT_NAME_RE = /^[A-Za-z0-9_]{1,50}$/;
 export const CUSTOM_LAYOUT_MAX_SLOTS = 26;
 export const CUSTOM_LAYOUT_MAX_GRID = 10;
+
+/**
+ * In-conference indicator icons (the "notch" at the top of the layout). Not
+ * listed in the docs; names taken from the v42 Base theme. Each has a black
+ * <item>.svg (light-mode notch) and a white <item>_dark.svg (default dark notch).
+ * Pexip: "we cannot guarantee compatibility with future versions" if customised.
+ */
+export const NOTCH_ICON_PREFIX = "icon_notch57tp_";
+export const NOTCH_ICONS = [
+  "participants", "audio", "video_muted", "raised_hand",
+  "conference_locked", "conference_unlocked",
+  "recording", "streaming", "public_streaming", "transcribing",
+  "live_captions", "ai", "smart_notes", "external_media_proc",
+];
+export const NOTCH_ICON_FILES = new Set(
+  NOTCH_ICONS.flatMap((i) => [`${NOTCH_ICON_PREFIX}${i}.svg`, `${NOTCH_ICON_PREFIX}${i}_dark.svg`]));
 
 // ---------------------------------------------------------------------------
 // Infinity versions

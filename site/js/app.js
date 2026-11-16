@@ -12,6 +12,7 @@ import { customLayoutNames, describeJsonError, validate } from "./validate.js";
 import { AUDIO_SOURCE_EXTENSIONS, toInfinityWav, wavDuration } from "./audio.js";
 import { fitImage, objectUrl } from "./imaging.js";
 import { sniffFormat, jpegInfo, pngInfo } from "./formats.js";
+import { checkNotchSvg, makeDarkVariant, notchFile } from "./icons.js";
 
 // ---------------------------------------------------------------------------
 // State
@@ -728,10 +729,15 @@ function indicatorCard(ind) {
   const update = () => {
     const cfg = current();
     const c = cfg.indicator_color_config?.[ind.color];
-    const label = ind.texts.length ? (cfg[ind.texts[0].key] || ind.title) : ind.title;
+    const text = ind.texts.length ? cfg[ind.texts[0].key] : undefined;
+    const label = text === "" ? "" : text || ind.title;
     const hidden = ind.hide && cfg[ind.hide] === true;
-    for (const [el, cc] of [[preview, c], [lightPreview, c?.light_mode]]) {
-      el.textContent = label;
+    const icon = ind.notch[0];
+    for (const [el, cc, dark] of [[preview, c, true], [lightPreview, c?.light_mode, false]]) {
+      el.replaceChildren(...[
+        icon ? h("img", { src: notchSrc(notchFile(icon, dark)), alt: "", class: "chip-icon" }) : null,
+        label ? h("span", {}, label) : null,
+      ].filter(Boolean));
       el.style.background = cssColor(cc?.background, "rgba(0,0,0,.7)");
       el.style.borderColor = cssColor(cc?.border, "rgba(0,0,0,.7)");
       el.style.color = cssColor(cc?.text, "#fff");
@@ -748,6 +754,7 @@ function indicatorCard(ind) {
   if (!canHide && !texts.length && !canColor) return null;
   const custom = canColor && Boolean(colors);
   const light = Boolean(colors?.light_mode);
+  const iconOnly = texts.length > 0 && texts.every((t) => current()[t.key] === "");
   const visibility = canHide ? (() => {
     const id = nextId();
     const cur = current()[ind.hide];
@@ -762,10 +769,28 @@ function indicatorCard(ind) {
   return h("section", { class: "card indicator" },
     h("div", { class: "indicator-head" },
       h("div", {}, h("h3", {}, ind.title), h("p", { class: "muted" }, ind.help)),
-      h("div", { class: "preview-stage", title: "Preview" }, preview, lightPreview)),
+      h("div", { class: "preview-side" },
+        h("div", { class: "preview-stage", title: "Preview" }, preview, lightPreview),
+        ind.notch.length ? h("button", { type: "button", class: "btn subtle small-btn", onclick: () => goToNotch(ind.notch[0]) }, "Change icon") : null)),
     h("div", { class: "fields" },
       visibility,
-      texts.map((t) => textField([t.key], t.label, { max: t.max, help: t.help }))),
+      texts.map((t) => {
+        const el = textField([t.key], t.label, { max: t.max, help: t.help });
+        if (iconOnly) el.querySelectorAll("input, textarea").forEach((i) => { i.disabled = true; i.value = ""; i.placeholder = "Hidden (icon only)"; });
+        return el;
+      })),
+    texts.length && ind.notch.length ? h("label", { class: "toggle" },
+      h("input", {
+        type: "checkbox", checked: iconOnly,
+        onchange: (e) => {
+          for (const t of texts) {
+            if (e.target.checked) state.edits.set([t.key], "");
+            else state.edits.remove([t.key]);
+          }
+          changed({ rerender: true });
+        },
+      }), " Icon only (hide text) ", h("span", { class: "pill-exp" }, "Experimental")) : null,
+    iconOnly ? h("p", { class: "notice-inline" }, "Untested: Infinity's docs don't say whether empty text hides the label. Try it on a test meeting room first.") : null,
     !canColor ? h("p", { class: "muted small" }, rules.minVersion("indicator", ind.color) === rules.NEVER
       ? "Infinity doesn't accept custom colours for this indicator yet (Pexip's docs list them, but uploads are rejected)."
       : `Custom colours for this indicator need Infinity v${rules.minVersion("indicator", ind.color)}.`) : null,
@@ -1312,18 +1337,106 @@ function imageSlotCard(slot) {
           ? h("button", { type: "button", class: "btn subtle", onclick: () => { restoreFile(slot.file); changed({ rerender: true }); } }, "Restore original") : null)));
 }
 
+// -- Indicator icons (icon_notch57tp_*.svg) --------------------------------------
+
+const notchUrls = new WeakMap();
+
+/** Preview URL for a notch icon: the theme's file if it has one, otherwise Pexip's default. */
+function notchSrc(file) {
+  const bytes = build().theme.files[file];
+  if (!bytes) return `defaults/notch/${file}`;
+  if (!notchUrls.has(bytes)) notchUrls.set(bytes, URL.createObjectURL(new Blob([bytes], { type: "image/svg+xml" })));
+  return notchUrls.get(bytes);
+}
+
+function notchStatus(item) {
+  const files = [notchFile(item), notchFile(item, true)];
+  if (files.some((f) => f in state.files)) return "Custom";
+  if (files.some((f) => f in build().theme.files)) return "From theme ZIP";
+  return "Default";
+}
+
+async function uploadNotch(item, whiteOnly = false) {
+  const [file] = await pickFiles({ accept: ".svg,image/svg+xml" });
+  if (!file) return;
+  const text = await file.text();
+  const problems = checkNotchSvg(text);
+  const errors = problems.filter((p) => p.level === "error");
+  if (errors.length) { toast(`${file.name}: ${errors[0].message}`, "error"); return; }
+  for (const p of problems) toast(`${file.name}: ${p.message}`, "info");
+  if (whiteOnly) {
+    setFile(notchFile(item, true), utf8.encode(text));
+    toast("White version updated for the dark indicator bar", "success");
+  } else {
+    const { svg, recoloured } = makeDarkVariant(text);
+    setFile(notchFile(item), utf8.encode(text));
+    setFile(notchFile(item, true), utf8.encode(svg));
+    toast(recoloured
+      ? "Icon added. A white version was made for the dark indicator bar."
+      : "Icon added. It has colours, so the same artwork is used on the dark bar. Upload a white version if it's hard to see.",
+    recoloured ? "success" : "info");
+  }
+  changed({ rerender: true });
+}
+
+function goToNotch(item) {
+  go("images");
+  document.getElementById(`notch-${item}`)?.scrollIntoView({ block: "center" });
+}
+
+function notchCard(item) {
+  const info = catalog.NOTCH_ICON_INFO[item];
+  const light = notchFile(item);
+  const dark = notchFile(item, true);
+  const status = notchStatus(item);
+  const issues = [...fileIssues(light), ...fileIssues(dark)];
+  return h("section", { class: "card notch-card", id: `notch-${item}` },
+    h("div", { class: "slot-head" }, h("h3", {}, info.title), h("span", { class: `badge ${status.replace(/\s/g, "-").toLowerCase()}` }, status)),
+    h("p", { class: "muted small" }, info.help),
+    h("div", { class: "notch-previews" },
+      h("div", { class: "notch-stage dark", title: "Dark indicator bar (default) at 48, 20 and 12 px" },
+        [48, 20, 12].map((px) => h("span", { class: "notch-bubble" },
+          h("img", { src: notchSrc(dark), width: px, height: px, alt: px === 48 ? `${info.title} icon` : "" })))),
+      h("div", { class: "notch-stage light", title: "Light-mode indicator bar at 20 px" },
+        h("span", { class: "notch-bubble light" }, h("img", { src: notchSrc(light), width: 20, height: 20, alt: "" })))),
+    issueList(issues),
+    h("div", { class: "row" },
+      h("button", { type: "button", class: "btn", onclick: () => uploadNotch(item) }, "Upload icon…"),
+      h("button", { type: "button", class: "btn subtle", title: "Replace only the white version used on the dark bar", onclick: () => uploadNotch(item, true) }, "White version…"),
+      status !== "Default" ? h("button", {
+        type: "button", class: "btn subtle",
+        onclick: () => { removeFile(light); removeFile(dark); changed({ rerender: true }); },
+      }, "Use default") : null));
+}
+
+function notchSection() {
+  return section("Indicator icons", null,
+    h("p", { class: "muted" },
+      "Replace the icons shown in the indicator bar at the top of the meeting layout (participants, recording, locked and more). ",
+      "Upload one black SVG and Theme Studio makes the white version for the dark bar. The text next to an icon is set in Settings → Indicators."),
+    h("div", { class: "notice" }, h("span", {},
+      h("strong", {}, "Pexip's advice: "),
+      "“We recommend that you do not customize these elements as we cannot guarantee compatibility with future versions of Pexip Infinity.” ",
+      "Check your icons after each Infinity upgrade.")),
+    h("ul", { class: "list small muted" },
+      h("li", {}, "SVG with a square viewBox (24×24 recommended), simple shapes, one colour."),
+      h("li", {}, "It must be clear at 12 px. Infinity always draws it on a semi-transparent grey background you can't change.")),
+    h("div", { class: "notch-grid" }, rules.NOTCH_ICONS.map(notchCard)));
+}
+
 RENDERERS.images = () => {
   previewUrls.forEach((u) => URL.revokeObjectURL(u));
   previewUrls = [];
   const slotFiles = new Set(catalog.IMAGE_SLOTS.map((s) => s.file));
   const files = build().theme.files;
   const others = [...new Set([...Object.keys(files), ...state.removedFiles])]
-    .filter((f) => f !== rules.THEMECONFIG && !slotFiles.has(f) && !rules.BASE_AUDIO_FILES.has(f))
+    .filter((f) => f !== rules.THEMECONFIG && !slotFiles.has(f) && !rules.BASE_AUDIO_FILES.has(f) && !rules.NOTCH_ICON_FILES.has(f))
     .sort();
   return h("div", {},
     h("h1", {}, "Images"),
     h("p", { class: "lead" }, "Upload your logos and backgrounds. Images in the wrong size or format are converted automatically (backgrounds are cropped to fill 1920×1080, logos are fitted inside 200×100)."),
     h("div", { class: "slot-grid" }, catalog.IMAGE_SLOTS.map(imageSlotCard)),
+    notchSection(),
     section("Other theme files", "Splash screen icons (icon_*.svg), extra backgrounds (background_*.jpg), custom layouts (custom_layout_*.json) and other files in the theme.",
       h("button", {
         type: "button", class: "btn",

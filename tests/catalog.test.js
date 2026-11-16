@@ -57,3 +57,11 @@ test("Infinity's default wording is known for every voice prompt", () => {
     if (d.only) assert.ok(catalog.GATEWAY_ONLY[d.only], `${f}: ${d.only}`);
   }
 });
+
+test("indicator icons are described and linked to indicator cards", () => {
+  assert.deepEqual(new Set(Object.keys(catalog.NOTCH_ICON_INFO)), new Set(rules.NOTCH_ICONS));
+  for (const ind of catalog.INDICATORS) {
+    assert.ok(Array.isArray(ind.notch), `${ind.id} needs a notch list`);
+    for (const item of ind.notch) assert.ok(rules.NOTCH_ICONS.includes(item), `${ind.id}: ${item}`);
+  }
+});

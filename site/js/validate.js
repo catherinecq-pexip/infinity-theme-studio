@@ -193,6 +193,8 @@ function validateConfig(config, theme, customLayouts, report) {
         report.error(F, `"${key}" must be a string.`);
       } else if (max !== undefined && [...value].length > max) {
         report.error(F, `"${key}" is ${[...value].length} characters; maximum is ${max}.`);
+      } else if (value === "" && key.endsWith("_indicator_text")) {
+        report.warn(F, `"${key}" is empty ("icon only"). This is untested: Infinity's docs don't say whether empty text hides the label. Check on a test meeting room.`);
       }
     } else if (rules.NUMBER_SETTINGS.has(key)) {
       if (!isNumber(value) || value < 0) report.error(F, `"${key}" must be a non-negative number.`);
@@ -560,6 +562,14 @@ function validateSvg(fname, data, report) {
   if (paths.length === 1 && (paths[0].attrs.d ?? "").length > 20000) {
     report.warn(fname, "One very large path; Pexip advises multiple simpler paths for reliable rendering.");
   }
+  if (fname.startsWith(rules.NOTCH_ICON_PREFIX)) {
+    if (!rules.NOTCH_ICON_FILES.has(fname)) {
+      report.warn(fname, "Not one of Infinity's indicator icon names, so Infinity won't use it.");
+    }
+    if (!doc.elements[0].attrs.viewBox) {
+      report.warn(fname, "Indicator icon has no viewBox, so it may not scale to the 12–48 px Infinity uses.");
+    }
+  }
 }
 
 const CONVERT_HINT = "Re-add it in the Voice prompts step to convert it automatically.";
@@ -577,7 +587,12 @@ function validateWav(fname, data, report) {
   }
   const problems = [];
   if (info.format !== 1) problems.push("not PCM");
-  if (info.bitsPerSample !== rules.AUDIO_SAMPLE_WIDTH_BYTES * 8) problems.push(`${info.bitsPerSample}-bit (needs 16-bit)`);
+  if (info.bitsPerSample === 24) {
+    // Pexip's own v42 Base theme ships some prompts as 24-bit, so Infinity accepts it.
+    report.warn(fname, `24-bit audio. 16-bit is the documented format (Pexip's Base theme uses 24-bit for some prompts). ${CONVERT_HINT}`);
+  } else if (info.bitsPerSample !== rules.AUDIO_SAMPLE_WIDTH_BYTES * 8) {
+    problems.push(`${info.bitsPerSample}-bit (needs 16-bit)`);
+  }
   if (info.channels !== rules.AUDIO_CHANNELS) problems.push(`${info.channels} channels (needs mono)`);
   if (info.sampleRate !== rules.AUDIO_SAMPLE_RATE) problems.push(`${info.sampleRate} Hz (needs 48000 Hz)`);
   if (problems.length) {

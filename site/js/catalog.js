@@ -8,6 +8,7 @@ export const DOCS = {
   creating: "https://docs.pexip.com/admin/themes_creating_editing.htm",
   layoutDesigner: "https://cdn.pexip.com/layout/",
   brandingPortal: "https://branding.pexip.io/brand",
+  notchIcons: "https://docs.pexip.com/admin/themes_file_requirements.htm",
 };
 
 /** Built-in experience profiles (files in site/profiles/). */
@@ -19,12 +20,12 @@ export const PROFILE_NAMES = ["standard", "secure", "event", "client", "receptio
 
 export const INDICATORS = [
   {
-    id: "recording", title: "Recording", color: "recording", hide: "disable_recording_indicator",
+    id: "recording", notch: ["recording"], title: "Recording", color: "recording", hide: "disable_recording_indicator",
     help: "Shown to everyone while the meeting is being recorded.",
     texts: [{ key: "recording_indicator_text", label: "Indicator text" }],
   },
   {
-    id: "streaming", title: "Streaming", color: "streaming", hide: "disable_streaming_indicator",
+    id: "streaming", notch: ["streaming", "public_streaming"], title: "Streaming", color: "streaming", hide: "disable_streaming_indicator",
     help: "Shown while the meeting is being streamed.",
     texts: [
       { key: "streaming_indicator_text", label: "Streaming text" },
@@ -32,12 +33,12 @@ export const INDICATORS = [
     ],
   },
   {
-    id: "transcribing", title: "Transcribing", color: "transcribing", hide: "disable_transcribing_indicator",
+    id: "transcribing", notch: ["transcribing"], title: "Transcribing", color: "transcribing", hide: "disable_transcribing_indicator",
     help: "Shown while the meeting is being transcribed.",
     texts: [{ key: "transcribing_indicator_text", label: "Indicator text" }],
   },
   {
-    id: "captions", title: "Live captions", color: "captions", hide: null,
+    id: "captions", notch: ["live_captions"], title: "Live captions", color: "captions", hide: null,
     help: "Shown when live captions are switched on or off.",
     texts: [
       { key: "live_captions_on_indicator_text", label: "Captions on text" },
@@ -45,23 +46,23 @@ export const INDICATORS = [
     ],
   },
   {
-    id: "ai", title: "AI", color: "ai", hide: "disable_ai_indicator",
+    id: "ai", notch: ["ai"], title: "AI", color: "ai", hide: "disable_ai_indicator",
     help: "Shown while AI services are active in the meeting.",
     texts: [{ key: "ai_indicator_text", label: "Indicator text" }],
   },
   {
-    id: "smart_notes", title: "Smart notes", color: "gms_smart_notes", hide: "disable_smart_notes_indicator",
+    id: "smart_notes", notch: ["smart_notes"], title: "Smart notes", color: "gms_smart_notes", hide: "disable_smart_notes_indicator",
     help: "Shown while smart notes are being taken.",
     texts: [{ key: "smart_notes_indicator_text", label: "Indicator text" }],
   },
   {
-    id: "external_media_proc", title: "External media processing", color: "external_media_proc",
+    id: "external_media_proc", notch: ["external_media_proc"], title: "External media processing", color: "external_media_proc",
     hide: "disable_external_media_proc_indicator",
     help: "Shown while meeting media is sent to an external processing service.",
     texts: [{ key: "external_media_proc_indicator_text", label: "Indicator text" }],
   },
   {
-    id: "locked", title: "Meeting locked", color: "locked", hide: "disable_conference_locked_indicator",
+    id: "locked", notch: ["conference_locked", "conference_unlocked"], title: "Meeting locked", color: "locked", hide: "disable_conference_locked_indicator",
     help: "Shown when the meeting is locked or unlocked, and when people are waiting to be let in.",
     texts: [
       { key: "conference_locked_indicator_text", label: "Locked text", max: 20 },
@@ -71,11 +72,11 @@ export const INDICATORS = [
     ],
   },
   {
-    id: "hand_raised", title: "Raised hand", color: "hand_raised", hide: null,
+    id: "hand_raised", notch: ["raised_hand"], title: "Raised hand", color: "hand_raised", hide: null,
     help: "Shown when a participant raises their hand.", texts: [],
   },
   {
-    id: "speaker", title: "Active speaker", color: "speaker", hide: null,
+    id: "speaker", notch: [], title: "Active speaker", color: "speaker", hide: null,
     help: "Highlights the person currently speaking.", texts: [],
   },
 ];
@@ -111,6 +112,8 @@ export const GENERAL_SECTIONS = [
       { key: "disable_multiscreen", type: "bool", label: "Disable multiscreen",
         help: "Multiscreen lets room systems with more than one display show extra participants." },
       { key: "disable_comfort_noise", type: "bool", label: "Disable comfort noise" },
+      { key: "no_main_video_bg", type: "color", label: "Background colour when there's no main video",
+        help: "Found in Pexip's language themes (e.g. English US); not in the theme docs." },
       { key: "enable_solo_streaming_loopback", type: "bool", label: "Enable solo streaming loopback" },
       { key: "reserved_slot_overlay_text", type: "text", label: "Reserved slot overlay text",
         help: "Text shown on a layout slot that is reserved for a participant who hasn't joined yet." },
@@ -401,4 +404,22 @@ export const GATEWAY_ONLY = {
   "google-meet": "Only played to callers joining Google Meet through Infinity",
   "teams": "Only played to callers joining Microsoft Teams through Infinity",
   "google-meet-or-teams": "Only played to callers joining Google Meet or Microsoft Teams through Infinity",
+};
+
+/** In-conference indicator icons (rules.NOTCH_ICONS): what each one shows. */
+export const NOTCH_ICON_INFO = {
+  participants: { title: "Participant count", help: "Shown with the number of people in the meeting." },
+  audio: { title: "Audio-only participants", help: "Shown with the number of people joined by audio only." },
+  video_muted: { title: "Camera off", help: "Shown with the number of people whose camera is off." },
+  raised_hand: { title: "Raised hand", help: "Shown with the number of raised hands." },
+  conference_locked: { title: "Meeting locked", help: "Shown while the meeting is locked." },
+  conference_unlocked: { title: "Meeting unlocked", help: "Shown briefly when the meeting is unlocked." },
+  recording: { title: "Recording", help: "Shown while the meeting is recorded. Red by default." },
+  streaming: { title: "Streaming", help: "Shown while the meeting is streamed." },
+  public_streaming: { title: "Public streaming", help: "Shown while the meeting is streamed publicly." },
+  transcribing: { title: "Transcribing", help: "Shown while the meeting is transcribed. Red by default." },
+  live_captions: { title: "Live captions", help: "Shown when live captions are on." },
+  ai: { title: "AI", help: "Shown while AI services are active." },
+  smart_notes: { title: "Smart notes", help: "Shown while notes are being taken." },
+  external_media_proc: { title: "External media processing", help: "Shown while media is sent to an external application." },
 };

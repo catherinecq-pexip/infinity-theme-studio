@@ -17,7 +17,7 @@ Infinity Theme Studio is a web portal that takes the ZIP from Pexip's branding p
    The branding portal ZIP is *web app branding* (`webapp3/branding/manifest.json`), not a theme. Theme Studio reuses its brand name (as the theme name), logo (as the watermark), background (as the splash screen background) and brand colours (one click colours all in-call indicators), and gives the ZIP back unchanged at the end.
 2. **Experience.** Optionally pick ready-made profiles: Standard, Secure, Events, Client-facing, Virtual Reception.
 3. **Settings.** Fine-tune indicators (wording, colours, visibility), the classification banner, the clock/timer, keypad (DTMF) codes and layouts, splash screen wording, avatars, watermarks and more. Every change shows a live preview.
-4. **Images.** Upload logos and backgrounds. Wrong sizes or formats are fixed automatically.
+4. **Images.** Upload logos and backgrounds; wrong sizes or formats are fixed automatically. You can also replace the 14 **indicator icons** (participants, recording, locked…) with your own SVGs: upload a black icon and Theme Studio makes the white version for the dark bar. Pexip warns it can't guarantee these stay compatible with future Infinity versions. In Settings → Indicators, an experimental **Icon only** option hides an indicator's text (untested; try it on a test meeting room).
 5. **Voice prompts.** Replace any of the 44 spoken prompts. Upload any audio file or record with your microphone; it's converted to Infinity's format (16-bit mono 48 kHz WAV) automatically.
 6. **Review & download.** See any problems, then download your packages:
    - the **Infinity theme** ZIP: upload it in the Infinity Administrator interface (**Services > Themes**)
