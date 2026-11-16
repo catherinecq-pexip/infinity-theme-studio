@@ -87,11 +87,11 @@ export const INDICATORS = [
 export const GENERAL_SECTIONS = [
   {
     id: "branding", title: "Watermarks & text",
-    help: "The logo shown in the corner of the video, the mute hint, and the default text colour. Upload the images themselves in the Images step.",
+    help: "The logo shown on the main speaker video, the overlay shown to muted participants, and the default text colour. Upload the images themselves in the Images step.",
     fields: [
       { key: "disable_watermark_icon", type: "bool", label: "Hide the watermark logo" },
-      { key: "disable_watermark_mute_icon", type: "bool", label: "Hide the mute hint watermark",
-        help: "The mute hint shows callers on room systems which keypad code mutes them." },
+      { key: "disable_watermark_mute_icon", type: "bool", label: "Hide the muted overlay",
+        help: "An overlay shown under the indicators to participants who have been muted by an administrator. Infinity hides it by default." },
       { key: "text_color", type: "color", label: "Default text colour" },
     ],
   },
@@ -217,9 +217,9 @@ export const IMAGE_SLOTS = [
   { file: "watermark_icon.png", title: "Watermark logo", spec: "PNG, 200×100",
     help: "Your logo, shown in the corner of the video.", fit: { w: 200, h: 100, mode: "contain", type: "image/png" } },
   { file: "watermark_footer_icon.png", title: "Footer watermark", spec: "PNG, 200×100",
-    help: "Optional second watermark image.", fit: { w: 200, h: 100, mode: "contain", type: "image/png" } },
-  { file: "watermark_mute_icon.png", title: "Mute hint", spec: "PNG, up to 200×100",
-    help: "Tells room system callers how to mute with the keypad. Update it if you change the mute code.",
+    help: "Only used in the 1 + 33 layout, at the bottom on a white background, so use inverted (dark) colours.", fit: { w: 200, h: 100, mode: "contain", type: "image/png" } },
+  { file: "watermark_mute_icon.png", title: "Muted overlay", spec: "PNG, 200×100",
+    help: "Shown under the indicators to a participant who has been muted by an administrator (switch it on in Settings → General). If it mentions a keypad code, keep it in sync with your keypad settings.",
     fit: { w: 200, h: 100, mode: "contain", type: "image/png" } },
   { file: "background.jpg", title: "Splash screen background", spec: "JPG (RGB), 1920×1080",
     help: "Behind every splash screen unless a screen sets its own.", fit: { w: 1920, h: 1080, mode: "cover", type: "image/jpeg" } },
@@ -299,7 +299,7 @@ export const AUDIO_GROUPS = [
 /** Capability overview shown on the Start step. */
 export const CAPABILITIES = [
   ["Splash screens", "Backgrounds, logos and wording for every screen people see before and between meetings."],
-  ["Watermarks", "Your logo on the video, and a mute hint for room systems."],
+  ["Watermarks", "Your logo on the main speaker video, a footer logo, and an overlay for muted participants."],
   ["In-call indicators", "Wording, colours and visibility for recording, streaming, captions, AI, lock and more."],
   ["Classification banner", "Internal / Confidential / Secret labels that hosts can change mid-meeting."],
   ["Clock & timer", "Elapsed time, a countdown, or the time of day in any time zone."],

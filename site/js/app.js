@@ -1092,7 +1092,7 @@ SETTINGS_PANES.keypad = () => {
             changed({ rerender: true });
           },
         }), " Choose my own keypad codes"),
-      custom ? h("p", { class: "muted small" }, "Two characters per command (0-9, * and #). Leave a command blank to leave it out of your list. Your branding ZIP or Infinity's Base theme shows the current defaults. If you move mute away from *6, update the mute hint image too.") : null,
+      custom ? h("p", { class: "muted small" }, "Two characters per command (0-9, * and #). Leave a command blank to leave it out of your list. Your branding ZIP or Infinity's Base theme shows the current defaults. If you move mute away from *6 and your muted overlay image mentions the code, update the image too.") : null,
       table),
     section("Layouts available from the keypad", "Limit which layouts callers can cycle through with the change-layout codes.",
       h("label", { class: "toggle" },

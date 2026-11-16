@@ -236,7 +236,7 @@ function validateDtmf(cmds, report) {
     seen.add(action);
   }
   if (Object.values(cmds).includes("toggle_self_mute") && cmds["*6"] !== "toggle_self_mute") {
-    report.warn(F, "Self-mute is no longer *6: update watermark_mute_icon.png so it shows the new code.");
+    report.warn(F, "Self-mute is no longer *6: if watermark_mute_icon.png mentions the code, update it.");
   }
 }
 
