@@ -765,7 +765,9 @@ function indicatorCard(ind) {
     h("div", { class: "fields" },
       visibility,
       texts.map((t) => textField([t.key], t.label, { max: t.max, help: t.help }))),
-    !canColor ? h("p", { class: "muted small" }, `Custom colours for this indicator need Infinity v${rules.minVersion("indicator", ind.color)}.`) : null,
+    !canColor ? h("p", { class: "muted small" }, rules.minVersion("indicator", ind.color) === rules.NEVER
+      ? "Infinity doesn't accept custom colours for this indicator yet (Pexip's docs list them, but uploads are rejected)."
+      : `Custom colours for this indicator need Infinity v${rules.minVersion("indicator", ind.color)}.`) : null,
     canColor ? h("label", { class: "toggle" },
       h("input", {
         type: "checkbox", checked: custom,

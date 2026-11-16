@@ -153,7 +153,9 @@ function validateConfigFile(theme, report) {
 
 /** Items the target Infinity version will reject ("Unsupported field"). */
 function validateVersion(config, theme, version, report) {
-  const needs = (kind, n) => `needs Infinity v${rules.minVersion(kind, n)} or later; v${version} will reject the theme.`;
+  const needs = (kind, n) => rules.minVersion(kind, n) === rules.NEVER
+    ? `isn't accepted by Infinity ("Unsupported field"), even though Pexip's docs list it.`
+    : `needs Infinity v${rules.minVersion(kind, n)} or later; v${version} will reject the theme.`;
   for (const key of Object.keys(config)) {
     if (!rules.supports(version, "setting", key)) report.error(F, `"${key}" ${needs("setting", key)}`);
   }

@@ -144,7 +144,7 @@ export function buildConfig({ baseConfig = {}, profiles = [], edits = null }) {
  */
 export function stripUnsupported(config, files, version) {
   const log = [];
-  const needs = (kind, n) => `needs Infinity v${rules.minVersion(kind, n)}`;
+  const needs = (kind, n) => rules.requirement(kind, n);
   for (const key of Object.keys(config)) {
     if (!rules.supports(version, "setting", key)) {
       delete config[key];

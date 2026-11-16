@@ -287,9 +287,14 @@ export const SUPPORTED_VERSIONS = [42, 41, 40, 39, 38];
  * every version the portal supports. Derived from Pexip's versioned theme docs
  * (docs.pexip.com/v36 … v42) plus what real systems accept:
  * - indicator colours external_media_proc / gms_smart_notes appear in the v41
- *   docs, but a v41 system rejected external_media_proc ("Unsupported field"),
- *   so both are treated as v42+.
+ *   and v42 docs, but both v41 and v42 systems rejected
+ *   indicator_color_config.external_media_proc ("Unsupported field"). Infinity
+ *   stops at the first bad key (alphabetical: ai and captions passed), so
+ *   gms_smart_notes, listed in the docs alongside it, is untested and treated
+ *   the same way. Both are NEVER until a real system accepts them.
  */
+export const NEVER = Infinity;
+
 export const MIN_VERSION = {
   setting: {
     disable_external_media_proc_indicator: 39,
@@ -305,8 +310,8 @@ export const MIN_VERSION = {
     clock_data: 42,
   },
   indicator: {
-    external_media_proc: 42,
-    gms_smart_notes: 42,
+    external_media_proc: NEVER,
+    gms_smart_notes: NEVER,
   },
   audio: {
     "conf-external-media-processing-start_48kHz_mono.wav": 39,
@@ -329,4 +334,10 @@ export function minVersion(kind, name) {
 
 export function supports(version, kind, name) {
   return minVersion(kind, name) <= version;
+}
+
+/** Human-readable requirement, e.g. "needs Infinity v42" or "isn't accepted by Infinity". */
+export function requirement(kind, name) {
+  const v = minVersion(kind, name);
+  return v === NEVER ? "isn't accepted by Infinity" : `needs Infinity v${v}`;
 }
