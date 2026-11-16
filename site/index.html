@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infinity Theme Studio</title>
+  <meta name="description" content="Build, customise and validate Pexip Infinity themes in your browser.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23243b6b'/%3E%3Cpath d='M9 16c0-3 2-5 4.5-5S18 16 18 16s2 5 4.5 5S27 19 27 16s-2-5-4.5-5S18 16 18 16s-2 5-4.5 5S9 19 9 16z' fill='none' stroke='%23fff' stroke-width='2.4'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="vendor/jszip.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">∞</span>
+      <span class="brand-name">Infinity Theme Studio</span>
+      <span class="pill">Unofficial</span>
+    </div>
+    <div class="topbar-right">
+      <span class="privacy" title="Nothing you add is uploaded anywhere. Files are processed on your computer.">🔒 Everything stays in your browser</span>
+    </div>
+  </header>
+  <div class="layout">
+    <nav class="sidebar" id="sidebar" aria-label="Steps"></nav>
+    <main class="main" id="main" tabindex="-1">
+      <noscript><p class="card">Infinity Theme Studio needs JavaScript enabled.</p></noscript>
+      <p class="loading">Loading…</p>
+    </main>
+  </div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+</body>
+</html>

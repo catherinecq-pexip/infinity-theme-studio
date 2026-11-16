@@ -1,0 +1,14 @@
+{
+  "name": "infinity-theme-studio",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Browser-based portal to build, validate and package Pexip Infinity themes (unofficial tool).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "node tools/serve.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

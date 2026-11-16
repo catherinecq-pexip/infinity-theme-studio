@@ -1,0 +1,5 @@
+{
+    "$comment": "Example overlay: countdown for a 1-hour session and custom DTMF layouts. Import it in the Settings step under Advanced: import JSON.",
+    "clock_data": {"type": "remaining", "starting_value": 3600, "prefix": "Time left: "},
+    "dtmf_allowed_layouts": ["ac", "1:7", "2x2", "3x3"]
+}

@@ -1,4 +1,5 @@
 {
+    "$title": "Secure meetings",
     "$comment": "Secure profile: classification banner (hosts can change level via client API set_classification_level), mute icon, lock wording. Add a recorded conf-classification-changed_48kHz_mono.wav for a spoken announcement.",
     "disable_watermark_icon": true,
     "disable_watermark_mute_icon": false,

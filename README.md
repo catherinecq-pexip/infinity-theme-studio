@@ -1,119 +1,82 @@
 # Infinity Theme Studio
 
-Themes can change almost everything callers see and hear on Pexip Infinity's side — splash screens, overlays, classification banners, clocks, layouts, voice prompts and keypad controls — for **browsers and room systems alike**.
+**Open the portal: https://catherinecq-pexip.github.io/infinity-theme-studio/**
 
-Infinity Theme Studio is a toolkit for building, validating and deploying those themes, including the settings Pexip's branding portal doesn't cover.
+Themes can change almost everything callers see and hear on Pexip Infinity's side: splash screens, watermarks, in-call indicators, classification banners, clocks, keypad controls and voice prompts, for **browsers and room systems alike**.
 
-> **Unofficial tool.** Not a Pexip product and not supported by Pexip. Always test themes on a non-production VMR first.
+Infinity Theme Studio is a web portal that takes the ZIP from Pexip's branding portal (or nothing at all), lets you walk through every theme capability, checks the result against Infinity's rules, and gives you a finished theme ZIP to upload.
 
-## What it does (v0.1)
+- **Nothing to install.** It runs in any current browser (Chrome, Edge, Firefox, Safari).
+- **Private.** Your files are processed on your own computer and never uploaded anywhere.
 
-| Command | Purpose |
-|---|---|
-| `theme-studio validate` | Checks theme ZIPs/folders against Infinity's documented rules — JSON structure, `theme_version`, colours, DTMF codes, classification, clock, splash screens, image sizes/modes, SVG sanity, audio format, custom layouts |
-| `theme-studio finish` | The **theme finisher**: takes a branding-portal ZIP (or nothing) and merges in profiles, extra settings, files and voice prompts, then validates and packages it |
-| `theme-studio audio` | Converts any audio file to Infinity's format (PCM WAV, 16-bit, mono, 48 kHz) via ffmpeg |
-| `theme-studio upload` | Uploads a theme through the Management API and optionally assigns it to VMRs/Auditoriums/Receptions |
-| `theme-studio profiles` | Lists built-in experience profiles: `standard`, `secure`, `event`, `client`, `reception` |
-| `theme-studio rules` | Prints the key file requirements |
+> **Unofficial tool.** Not a Pexip product and not supported by Pexip. Always test themes on a non-production meeting room first.
 
-## Install
+## How to use it
 
-Requires Python 3.10+. ffmpeg is optional (only for audio conversion).
+1. **Start.** Drop in your branding portal ZIP (or any existing theme ZIP), or start from scratch. Give the theme a name.
+2. **Experience.** Optionally pick ready-made profiles: Standard, Secure, Events, Client-facing, Virtual Reception.
+3. **Settings.** Fine-tune indicators (wording, colours, visibility), the classification banner, the clock/timer, keypad (DTMF) codes and layouts, splash screen wording, avatars, watermarks and more. Every change shows a live preview.
+4. **Images.** Upload logos and backgrounds. Wrong sizes or formats are fixed automatically.
+5. **Voice prompts.** Replace any of the 44 spoken prompts. Upload any audio file or record with your microphone; it's converted to Infinity's format (16-bit mono 48 kHz WAV) automatically.
+6. **Review & download.** See any problems, then download the ZIP and upload it in the Infinity Administrator interface (**Services > Themes**).
 
-```bash
-git clone https://github.com/catherinecq-pexip/infinity-theme-studio.git
-cd infinity-theme-studio
-python -m venv .venv
-# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install -e .
-theme-studio --version
-```
-
-## Quick start
-
-**1. Validate a theme**
-```bash
-theme-studio validate my-theme.zip
-```
-
-**2. Finish a branding-portal theme with the Secure profile and custom voice prompts**
-```bash
-theme-studio finish portal-export.zip --name secure \
-  --profile secure \
-  --add watermark_icon.png \
-  --audio-dir prompts/secure \
-  --out dist/secure.zip
-```
-Name each audio file after the prompt it replaces (any format ffmpeg reads), e.g. `prompts/secure/conf-classification-changed_48kHz_mono.mp3`.
-
-**3. Build a theme from a profile only (no artwork yet)**
-```bash
-theme-studio finish --name event --profile event --out dist/event.zip
-```
-
-**4. Upload and assign**
-```bash
-# Set credentials as environment variables (never commit them)
-export INFINITY_MGR_HOST=manager.example.com
-export INFINITY_MGR_USER=admin
-export INFINITY_MGR_PASSWORD='...'
-
-theme-studio upload dist/secure.zip --name secure --assign "Secure Test" --dry-run
-theme-studio upload dist/secure.zip --name secure --assign "Secure Test"
-```
-PowerShell: `$env:INFINITY_MGR_HOST="manager.example.com"` etc.
-
-Uploading a ZIP **replaces the whole theme** in Infinity — always upload the complete, finished theme.
+Uploading a ZIP **replaces the whole theme** in Infinity, so always upload the complete, finished theme.
 
 ## Profiles
 
-Profiles are `themeconfig.json` overlays in `src/theme_studio/profiles/`. Objects merge; other values (including lists) replace. Keys starting with `$` are comments.
+Profiles are `themeconfig.json` snippets in [`site/profiles/`](site/profiles/). Objects merge; other values (including lists) replace. Keys starting with `$` are comments (`$title` is the name shown in the portal).
 
 | Profile | Highlights |
 |---|---|
 | `standard` | No Pexip watermark, avatars for audio-only/camera-off participants |
-| `secure` | Classification banner (Internal / Confidential / Strictly Confidential), mute icon, lock wording, red recording indicator |
+| `secure` | Classification banner (Internal / Confidential / Strictly Confidential), mute hint, lock wording, red recording indicator |
 | `event` | "Live broadcast" wording, elapsed-time clock |
 | `client` | Friendly waiting-room text |
-| `reception` | Virtual Reception wording (add re-recorded `2sd-*.wav` prompts) |
+| `reception` | Virtual Reception wording (add re-recorded `2sd-*` prompts) |
 
-You can stack them and add your own: `--profile standard --overlay my-tweaks.json`.
+To add a profile: create `site/profiles/<name>.json` with a `$title` and `$comment`, and add `<name>` to `PROFILE_NAMES` in [`site/js/catalog.js`](site/js/catalog.js).
 
-## Project layout
+## For maintainers
+
+The portal is a static site (plain HTML, CSS and JavaScript, with no build step) in [`site/`](site/). Every push to `main` runs the tests and publishes `site/` to GitHub Pages.
 
 ```
-src/theme_studio/
-  rules.py      # Pexip theme rules (single source of truth — update per Infinity release)
-  validate.py   # validation engine
-  finish.py     # theme finisher (merge overlays/files/audio)
-  package.py    # ZIP/folder read & write
-  audio.py      # ffmpeg conversion
-  api.py        # Management API: upload + assign themes
-  cli.py        # command-line interface
-  profiles/     # experience profile overlays
-tests/          # unittest suite (runs with pytest too)
-docs/           # rules reference, roadmap, maintenance notes
+site/
+  index.html, css/styles.css
+  js/rules.js      # Pexip theme rules (single source of truth; update per Infinity release)
+  js/validate.js   # validation engine
+  js/build.js      # theme finisher: merge profiles, settings and files
+  js/package.js    # ZIP read/write (JSZip)
+  js/formats.js    # PNG/JPEG/WAV/SVG header checks
+  js/audio.js      # audio conversion (Web Audio API)
+  js/imaging.js    # image resize/convert
+  js/catalog.js    # names and descriptions shown in the portal
+  js/app.js        # the wizard UI
+  profiles/        # experience profiles
+  vendor/          # JSZip 3.10.1 (MIT)
+tests/             # node:test suite
+tools/serve.js     # local preview server
 ```
 
-## Development
+Run locally (needs [Node.js](https://nodejs.org/) 20+, maintainers only):
 
 ```bash
-pip install -e ".[dev]"
-pytest            # or: python -m unittest discover -s tests
+npm test     # run the tests
+npm start    # preview at http://localhost:8080
 ```
 
-## Roadmap
+The page must be served over HTTP; opening `index.html` directly from disk won't work.
 
-See [docs/roadmap.md](docs/roadmap.md). Next up: web app branding packages, a browser-based editor with splash-screen preview, custom layout designer, and text-to-speech voice prompts.
+**One-time GitHub setup:** repository **Settings > Pages > Build and deployment > Source: GitHub Actions**.
+
+See [docs/updating-rules.md](docs/updating-rules.md) when a new Infinity release changes theme settings, and [docs/roadmap.md](docs/roadmap.md) for what's next.
 
 ## References
 
 - [Rules and requirements for customized themes](https://docs.pexip.com/admin/themes_file_requirements.htm)
 - [Creating and applying themes](https://docs.pexip.com/admin/themes_creating_editing.htm)
-- [Management configuration API](https://docs.pexip.com/api_manage/api_configuration.htm)
 - [Pexip layout designer tool](https://cdn.pexip.com/layout/)
 
 ## License
 
-To be decided by the repository owner.
+To be decided by the repository owner. JSZip is used under the MIT license.

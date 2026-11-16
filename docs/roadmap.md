@@ -1,26 +1,22 @@
 # Roadmap
 
-## v0.1 — Theme finisher (this release)
+## v0.1: Theme finisher (Python CLI, retired)
 - [x] Validation engine based on Pexip's documented theme rules (Infinity v42)
 - [x] Theme finisher: merge profiles/overlays, add files, convert voice prompts
 - [x] Experience profiles: standard, secure, event, client, reception
-- [x] Management API upload + assign (create-or-update by theme name)
-- [x] CI: tests + build every profile
 
-## v0.2 — Safer deployments
-- [ ] `diff` command: compare a local theme with the one live in Infinity
-- [ ] `download` command: back up live themes before replacing them
-- [ ] Version history (git-friendly theme source folders + `build` command)
-- [ ] Deeper custom layout validation (grid, slots, overlaps)
+## v0.2: Browser portal (this release)
+- [x] Static web portal on GitHub Pages, no install, files never leave the browser
+- [x] Six-step wizard: branding ZIP → profiles → settings → images → voice prompts → review
+- [x] Form editor for every simple themeconfig setting, indicators with live colour previews,
+      classification banner, clock/timer, keypad codes and layouts, splash screen wording
+- [x] Automatic image fixing (size, format, RGB) and audio conversion; record prompts in the browser
+- [x] Validation in the browser, JSON import, downloadable ZIP
 
-## v0.3 — Web app branding
-- [ ] Build/validate Webapp3 branding packages (`manifest.json`)
-- [ ] Upload branding packages and map them to web app paths (`/meet`, `/secure`, `/events`, `/connect`)
-
-## v1.0 — Theme Studio editor (browser UI)
-- [ ] Form editor for every themeconfig setting
+## Next
 - [ ] Splash-screen designer with 1920×1080 canvas, 4:3 crop guides and live preview
-- [ ] Custom layout grid designer (10×10, 26 slots)
-- [ ] Voice prompts via text-to-speech (e.g. Azure AI Speech) + automatic conversion
-- [ ] "Preview on test VMR" button (upload to a preview theme assigned to a test VMR)
-- [ ] Entra ID sign-in; Management API credentials kept server-side
+- [ ] Custom layout grid designer (10×10, 26 slots) and deeper layout validation
+- [ ] Web app branding packages (Webapp3 `manifest.json`) and path mapping (`/meet`, `/secure`, …)
+- [ ] Voice prompts via text-to-speech
+- [ ] Direct upload to Infinity (needs a small backend proxy for the Management API; credentials kept server-side)
+- [ ] Compare with / back up the theme currently live in Infinity

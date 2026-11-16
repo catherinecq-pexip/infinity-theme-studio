@@ -1,4 +1,5 @@
 {
+    "$title": "Events & broadcasts",
     "$comment": "Event profile: Virtual Auditoriums. Shows elapsed time and broadcast wording.",
     "disable_watermark_icon": true,
     "streaming_indicator_text": "Live broadcast",

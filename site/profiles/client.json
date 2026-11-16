@@ -1,4 +1,5 @@
 {
+    "$title": "Client-facing",
     "$comment": "Client profile: customer-facing meetings with friendlier waiting-room wording.",
     "disable_watermark_icon": true,
     "conference_locked_indicator_n_waiting_text": "{number_of_waiting_participants} waiting to join",

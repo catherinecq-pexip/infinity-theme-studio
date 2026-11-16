@@ -1,5 +1,6 @@
 {
-    "$comment": "Reception profile: Virtual Reception (IVR). Add re-recorded 2sd-*.wav prompts via --audio-dir.",
+    "$title": "Virtual Reception",
+    "$comment": "Reception profile: Virtual Reception (IVR). Add re-recorded 2sd-*.wav prompts in the Voice prompts step.",
     "disable_watermark_icon": true,
     "splash_screens": {
         "labels": {
