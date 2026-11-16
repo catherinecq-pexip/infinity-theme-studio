@@ -1,0 +1,9 @@
+{
+    "$comment": "Reception profile: Virtual Reception (IVR). Add re-recorded 2sd-*.wav prompts via --audio-dir.",
+    "disable_watermark_icon": true,
+    "splash_screens": {
+        "labels": {
+            "enter_conference_id": "Welcome.\nPlease enter your meeting number followed by #"
+        }
+    }
+}

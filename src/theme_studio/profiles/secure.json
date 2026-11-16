@@ -1,0 +1,18 @@
+{
+    "$comment": "Secure profile: classification banner (hosts can change level via client API set_classification_level), mute icon, lock wording. Add a recorded conf-classification-changed_48kHz_mono.wav for a spoken announcement.",
+    "disable_watermark_icon": true,
+    "disable_watermark_mute_icon": false,
+    "conference_locked_indicator_text": "Secure room locked",
+    "conference_unlocked_indicator_text": "Secure room unlocked",
+    "indicator_color_config": {
+        "recording": {"background": "0x33D73332", "border": "0xE6D73332", "text": "0xFFFFFFFF"}
+    },
+    "classification": {
+        "levels": {
+            "0": "Internal",
+            "1": {"text": "Confidential", "color": "0x000000", "bgcolor": "0xffd54f"},
+            "2": {"text": "Strictly Confidential", "color": "0xffffff", "bgcolor": "0xb00020"}
+        },
+        "default": 1
+    }
+}

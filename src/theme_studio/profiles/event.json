@@ -1,0 +1,10 @@
+{
+    "$comment": "Event profile: Virtual Auditoriums. Shows elapsed time and broadcast wording.",
+    "disable_watermark_icon": true,
+    "streaming_indicator_text": "Live broadcast",
+    "public_streaming_indicator_text": "Public live broadcast",
+    "clock_data": {
+        "type": "elapsed",
+        "prefix": "Live for "
+    }
+}

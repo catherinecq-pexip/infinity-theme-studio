@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "infinity-theme-studio"
+version = "0.1.0"
+description = "Build, validate and upload Pexip Infinity themes (unofficial tool)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pillow>=10",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+theme-studio = "theme_studio.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+theme_studio = ["profiles/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
