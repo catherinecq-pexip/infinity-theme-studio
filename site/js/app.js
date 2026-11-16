@@ -17,6 +17,14 @@ import { sniffFormat, jpegInfo, pngInfo } from "./formats.js";
 // State
 // ---------------------------------------------------------------------------
 
+function loadVersion() {
+  const v = Number(globalThis.localStorage?.getItem("its.infinityVersion"));
+  return rules.SUPPORTED_VERSIONS.includes(v) ? v : rules.LATEST_VERSION;
+}
+
+/** Does the chosen Infinity version accept this item? kind: setting | indicator | audio | dtmf */
+const ok = (kind, name) => rules.supports(state.version, kind, name);
+
 const state = {
   step: "start",
   settingsTab: "general",
@@ -37,6 +45,7 @@ const state = {
   allowErrors: false,
   dirty: false,
   recording: null,        // { file, recorder, stream }
+  version: loadVersion(), // Infinity version the theme is for
 };
 
 let cache = null;
@@ -54,8 +63,9 @@ function build() {
       edits: state.edits,
       files: state.files,
       removedFiles: state.removedFiles,
+      version: state.version,
     });
-    built.report = validate(built.theme);
+    built.report = validate(built.theme, { version: state.version });
     cache = built;
   }
   return cache;
@@ -307,6 +317,14 @@ function colorField(path, label, opts = {}) {
   return field(label, path.join("."), colorControl(path, { label, ...opts }), opts.help);
 }
 
+/** "Hidden for your version" note listing [label, minVersion] pairs. */
+function hiddenNote(items) {
+  if (!items.length) return null;
+  return h("p", { class: "muted small version-note" },
+    `Hidden for Infinity v${state.version}: `,
+    items.map(([label, v]) => `${label} (v${v}+)`).join(", "), ".");
+}
+
 function section(title, help, ...content) {
   return h("section", { class: "card" },
     h("h3", {}, title),
@@ -488,14 +506,15 @@ async function loadStartZip(file) {
 function applyBrandColour() {
   const base = state.branding?.baseColor;
   if (!base) return;
-  for (const type of rules.INDICATOR_TYPES) {
+  const types = [...rules.INDICATOR_TYPES].filter((t) => ok("indicator", t));
+  for (const type of types) {
     state.edits.replace(["indicator_color_config", type], {
       background: formatColor(base, 0xcc),
       border: formatColor(base, 0xff),
       text: formatColor("#ffffff", 0xff),
     });
   }
-  toast(`Brand colour applied to ${rules.INDICATOR_TYPES.size} indicators`, "success");
+  toast(`Brand colour applied to ${types.length} indicators`, "success");
   changed({ rerender: true });
 }
 
@@ -578,13 +597,30 @@ RENDERERS.start = () => {
               type: "button", class: "btn subtle",
               onclick: () => { clearStart(); changed({ rerender: true }); },
             }, "Start from scratch instead")))
-        : h("div", {}, drop, h("p", { class: "muted small" }, "No branding ZIP yet? Just continue. You can build a theme from scratch and add images later."))),
+        : h("div", {}, drop, h("p", { class: "muted small" },
+          "No branding ZIP yet? ", docsLink("Create one in Pexip's branding portal", catalog.DOCS.brandingPortal),
+          ", then download it and drop it here. Or just continue: you can build a theme from scratch and add images later."))),
 
-    section("2. Name your theme", "Used for the ZIP file and the folder inside it. Use the same name when you add it in Infinity.",
-      field("Theme name", null, h("input", {
-        id: nameId, type: "text", value: state.name, maxlength: 100,
-        oninput: (e) => { state.name = e.target.value; state.nameTouched = true; changed(); },
-      }), null, nameId)),
+    section("2. Name your theme and choose your Infinity version", null,
+      h("div", { class: "fields" },
+        field("Theme name", null, h("input", {
+          id: nameId, type: "text", value: state.name, maxlength: 100,
+          oninput: (e) => { state.name = e.target.value; state.nameTouched = true; changed(); },
+        }), "Used for the ZIP file and the folder inside it. Use the same name when you add it in Infinity.", nameId),
+        (() => {
+          const id = nextId();
+          return field("Infinity version", null, h("select", {
+            id, value: String(state.version),
+            onchange: (e) => {
+              state.version = Number(e.target.value);
+              try { localStorage.setItem("its.infinityVersion", String(state.version)); } catch { /* private mode */ }
+              toast(`Building for Infinity v${state.version}`, "success");
+              changed({ rerender: true });
+            },
+          }, rules.SUPPORTED_VERSIONS.map((v) => h("option", { value: String(v) },
+            v === rules.LATEST_VERSION ? `v${v} (latest)` : v === Math.min(...rules.SUPPORTED_VERSIONS) ? `v${v} or older` : `v${v}`))),
+          "The version you'll upload to (shown in the Infinity Administrator interface). Options your version doesn't support are hidden and left out of the theme.", id);
+        })())),
 
     section("What you can customise", null,
       h("div", { class: "capabilities" }, catalog.CAPABILITIES.map(([t, d]) => h("div", { class: "capability" }, h("strong", {}, t), h("span", {}, d))))),
@@ -620,7 +656,9 @@ RENDERERS.profiles = () => h("div", {},
       h("strong", {}, data.$title ?? n),
       selected ? h("span", { class: "order" }, state.profiles.length > 1 ? `#${order + 1}` : "✓") : null),
     h("p", {}, (data.$comment ?? "").replace(/^[^:]+:\s*/, "")),
-    h("div", { class: "chips" }, settingSummary(data).map((s) => h("span", { class: "chip" }, s))));
+    h("div", { class: "chips" }, Object.keys(data).filter((k) => !k.startsWith("$")).map((k) => ok("setting", k)
+      ? h("span", { class: "chip" }, k.replace(/_/g, " "))
+      : h("span", { class: "chip unsupported", title: `Needs Infinity v${rules.minVersion("setting", k)}, so it's left out for v${state.version}` }, k.replace(/_/g, " ")))));
   })),
   state.overlays.length
     ? h("p", { class: "muted" }, `Also applying ${state.overlays.length} imported JSON file(s). Manage them in Settings → Advanced.`)
@@ -659,12 +697,16 @@ RENDERERS.settings = () => {
 const SETTINGS_PANES = {};
 
 SETTINGS_PANES.general = () => h("div", {},
-  catalog.GENERAL_SECTIONS.map((s) => section(s.title, s.help, h("div", { class: "fields" }, s.fields.map((f) => {
-    if (f.type === "bool") return boolField(f);
-    if (f.type === "number") return numberField(f);
-    if (f.type === "color") return colorField([f.key], f.label, { help: f.help });
-    return textField([f.key], f.label, { help: f.help });
-  })))),
+  catalog.GENERAL_SECTIONS.map((s) => {
+    const fields = s.fields.filter((f) => ok("setting", f.key));
+    if (!fields.length) return null;
+    return section(s.title, s.help, h("div", { class: "fields" }, fields.map((f) => {
+      if (f.type === "bool") return boolField(f);
+      if (f.type === "number") return numberField(f);
+      if (f.type === "color") return colorField([f.key], f.label, { help: f.help });
+      return textField([f.key], f.label, { help: f.help });
+    })), hiddenNote(s.fields.filter((f) => !ok("setting", f.key)).map((f) => [f.label, rules.minVersion("setting", f.key)])));
+  }),
   section("Message box", "Colours of the message box shown over the video (for example, in-meeting notices).",
     h("div", { class: "fields" },
       colorField(["message_box_config", "text_color"], "Text colour", { alpha: true }),
@@ -699,9 +741,13 @@ function indicatorCard(ind) {
   previewUpdaters.push(update);
   update();
 
-  const custom = Boolean(colors);
+  const canHide = Boolean(ind.hide) && ok("setting", ind.hide);
+  const texts = ind.texts.filter((t) => ok("setting", t.key));
+  const canColor = ok("indicator", ind.color);
+  if (!canHide && !texts.length && !canColor) return null;
+  const custom = canColor && Boolean(colors);
   const light = Boolean(colors?.light_mode);
-  const visibility = ind.hide ? (() => {
+  const visibility = canHide ? (() => {
     const id = nextId();
     const cur = current()[ind.hide];
     const sel = triSelect(id, cur === true ? false : cur === false ? true : undefined, ["Infinity default", "Show", "Hide"], (v) => {
@@ -718,8 +764,9 @@ function indicatorCard(ind) {
       h("div", { class: "preview-stage", title: "Preview" }, preview, lightPreview)),
     h("div", { class: "fields" },
       visibility,
-      ind.texts.map((t) => textField([t.key], t.label, { max: t.max, help: t.help }))),
-    h("label", { class: "toggle" },
+      texts.map((t) => textField([t.key], t.label, { max: t.max, help: t.help }))),
+    !canColor ? h("p", { class: "muted small" }, `Custom colours for this indicator need Infinity v${rules.minVersion("indicator", ind.color)}.`) : null,
+    canColor ? h("label", { class: "toggle" },
       h("input", {
         type: "checkbox", checked: custom,
         onchange: (e) => {
@@ -727,7 +774,7 @@ function indicatorCard(ind) {
           else state.edits.remove(colorPath);
           changed({ rerender: true });
         },
-      }), " Custom colours"),
+      }), " Custom colours") : null,
     custom ? h("div", { class: "fields three" },
       colorField([...colorPath, "background"], "Background", { optional: false, alpha: true }),
       colorField([...colorPath, "border"], "Border", { optional: false, alpha: true }),
@@ -888,6 +935,10 @@ function clockSample(clock) {
 }
 
 SETTINGS_PANES.clock = () => {
+  if (!ok("setting", "clock_data")) {
+    return section("Clock & timer", null, h("p", { class: "muted" },
+      `The clock and timer need Infinity v${rules.minVersion("setting", "clock_data")} or later. You're building for v${state.version}; change it on the Start step.`));
+  }
   const clock = current().clock_data;
   const type = clock && typeof clock === "object" ? clock.type : "";
   const commit = (mutate) => {
@@ -1012,7 +1063,7 @@ SETTINGS_PANES.keypad = () => {
     }
   };
 
-  const table = custom ? h("div", { class: "dtmf-table" }, Object.entries(catalog.DTMF_COMMAND_LABELS).map(([cmd, label]) => {
+  const table = custom ? h("div", { class: "dtmf-table" }, Object.entries(catalog.DTMF_COMMAND_LABELS).filter(([cmd]) => ok("dtmf", cmd)).map(([cmd, label]) => {
     const id = nextId();
     inputs[cmd] = h("input", { id, type: "text", maxlength: 2, class: "dtmf-input", value: byCommand[cmd] ?? "", placeholder: "—", oninput: saveCommands, spellcheck: "false" });
     errors[cmd] = h("span", { class: "error-text" });
@@ -1393,8 +1444,14 @@ RENDERERS.voice = () => h("div", {},
   h("p", { class: "lead" }, "Replace any of Infinity's spoken prompts with your own voice, language or wording. Upload MP3, WAV, M4A and more, or record straight from your microphone. Audio is converted to the format Infinity needs (16-bit mono 48 kHz WAV) on your computer."),
   section("Add several at once", "Name each file after the prompt it replaces, for example conf-getpin.mp3 or conf-getpin_48kHz_mono.wav, and add them together.",
     h("button", { type: "button", class: "btn", onclick: bulkAddAudio }, "Add audio files…")),
-  catalog.AUDIO_GROUPS.map((g) => section(g.title, null,
-    h("div", { class: "prompts" }, Object.entries(g.prompts).map(([f, d]) => promptRow(f, d))))),
+  catalog.AUDIO_GROUPS.map((g) => {
+    const prompts = Object.entries(g.prompts).filter(([f]) => ok("audio", f));
+    const hidden = Object.entries(g.prompts).filter(([f]) => !ok("audio", f)).map(([f, d]) => [d, rules.minVersion("audio", f)]);
+    if (!prompts.length && !hidden.length) return null;
+    return section(g.title, null,
+      h("div", { class: "prompts" }, prompts.map(([f, d]) => promptRow(f, d))),
+      hiddenNote(hidden));
+  }),
 );
 
 // -- Step 6: Review ----------------------------------------------------------------

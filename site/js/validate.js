@@ -43,7 +43,11 @@ const repr = (v) => JSON.stringify(v);
 // Entry point
 // ---------------------------------------------------------------------------
 
-export function validate(theme) {
+/**
+ * Validate a theme. version: the Infinity version it will be uploaded to
+ * (defaults to the latest the rules describe).
+ */
+export function validate(theme, { version = rules.LATEST_VERSION } = {}) {
   const report = new Report();
   let config = null;
 
@@ -82,7 +86,10 @@ export function validate(theme) {
     }
   }
 
-  if (config !== null) validateConfig(config, theme, customLayoutNames, report);
+  if (config !== null) {
+    validateConfig(config, theme, customLayoutNames, report);
+    validateVersion(config, theme, version, report);
+  }
   return report;
 }
 
@@ -142,6 +149,27 @@ function validateConfigFile(theme, report) {
     return null;
   }
   return config;
+}
+
+/** Items the target Infinity version will reject ("Unsupported field"). */
+function validateVersion(config, theme, version, report) {
+  const needs = (kind, n) => `needs Infinity v${rules.minVersion(kind, n)} or later; v${version} will reject the theme.`;
+  for (const key of Object.keys(config)) {
+    if (!rules.supports(version, "setting", key)) report.error(F, `"${key}" ${needs("setting", key)}`);
+  }
+  if (isObject(config.indicator_color_config)) {
+    for (const type of Object.keys(config.indicator_color_config)) {
+      if (!rules.supports(version, "indicator", type)) report.error(F, `indicator_color_config.${type} ${needs("indicator", type)}`);
+    }
+  }
+  if (isObject(config.dtmf_conference_control_commands)) {
+    for (const cmd of Object.values(config.dtmf_conference_control_commands)) {
+      if (typeof cmd === "string" && !rules.supports(version, "dtmf", cmd)) report.error(F, `Keypad command "${cmd}" ${needs("dtmf", cmd)}`);
+    }
+  }
+  for (const fname of Object.keys(theme.files)) {
+    if (!rules.supports(version, "audio", fname)) report.error(fname, `This voice prompt ${needs("audio", fname)}`);
+  }
 }
 
 function validateConfig(config, theme, customLayouts, report) {

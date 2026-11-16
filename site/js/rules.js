@@ -272,3 +272,61 @@ export const CUSTOM_LAYOUT_PREFIX = "custom_layout_";
 export const CUSTOM_LAYOUT_NAME_RE = /^[A-Za-z0-9_]{1,50}$/;
 export const CUSTOM_LAYOUT_MAX_SLOTS = 26;
 export const CUSTOM_LAYOUT_MAX_GRID = 10;
+
+// ---------------------------------------------------------------------------
+// Infinity versions
+// ---------------------------------------------------------------------------
+
+export const LATEST_VERSION = Number(TARGET_INFINITY_VERSION);
+
+/** Versions offered in the portal's version picker (38 means "38 or older"). */
+export const SUPPORTED_VERSIONS = [42, 41, 40, 39, 38];
+
+/**
+ * First Infinity version that accepts each item. Anything not listed works on
+ * every version the portal supports. Derived from Pexip's versioned theme docs
+ * (docs.pexip.com/v36 … v42) plus what real systems accept:
+ * - indicator colours external_media_proc / gms_smart_notes appear in the v41
+ *   docs, but a v41 system rejected external_media_proc ("Unsupported field"),
+ *   so both are treated as v42+.
+ */
+export const MIN_VERSION = {
+  setting: {
+    disable_external_media_proc_indicator: 39,
+    external_media_proc_indicator_text: 39,
+    enable_avatars_in_mix: 40,
+    avatar_in_mix_text_color: 40,
+    avatar_in_mix_shape_color: 40,
+    disable_recording_indicator: 41,
+    disable_transcribing_indicator: 41,
+    disable_smart_notes_indicator: 41,
+    smart_notes_indicator_text: 41,
+    breakout_transfer_delay: 42,
+    clock_data: 42,
+  },
+  indicator: {
+    external_media_proc: 42,
+    gms_smart_notes: 42,
+  },
+  audio: {
+    "conf-external-media-processing-start_48kHz_mono.wav": 39,
+    "conf-external-media-processing-stopped_48kHz_mono.wav": 39,
+    "conf-classification-changed_48kHz_mono.wav": 41,
+    "conf-smart_notes_started_48kHz_mono.wav": 41,
+    "conf-smart_notes_stopped_48kHz_mono.wav": 41,
+    "call_about_to_be_transferred.wav": 42,
+    "call_about_to_transfer_to_main_room.wav": 42,
+  },
+  dtmf: {
+    cycle_personal_layout: 38,
+  },
+};
+
+/** First version supporting an item (0 = all versions). kind: setting | indicator | audio | dtmf */
+export function minVersion(kind, name) {
+  return MIN_VERSION[kind]?.[name] ?? 0;
+}
+
+export function supports(version, kind, name) {
+  return minVersion(kind, name) <= version;
+}

@@ -7,6 +7,7 @@ export const DOCS = {
   rules: "https://docs.pexip.com/admin/themes_file_requirements.htm",
   creating: "https://docs.pexip.com/admin/themes_creating_editing.htm",
   layoutDesigner: "https://cdn.pexip.com/layout/",
+  brandingPortal: "https://branding.pexip.io/brand",
 };
 
 /** Built-in experience profiles (files in site/profiles/). */

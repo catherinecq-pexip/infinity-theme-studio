@@ -5,8 +5,10 @@
 //   1. experience profiles and imported JSON overlays are deep-merged,
 //   2. settings the user removed in the portal are deleted,
 //   3. settings the user edited in the portal are deep-merged on top,
-//   4. files (images, voice prompts, layouts) are added/replaced/removed.
+//   4. files (images, voice prompts, layouts) are added/replaced/removed,
+//   5. anything the target Infinity version doesn't accept is left out.
 
+import * as rules from "./rules.js";
 import { copyTheme, loadConfig, newTheme, saveConfig } from "./package.js";
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -136,7 +138,48 @@ export function buildConfig({ baseConfig = {}, profiles = [], edits = null }) {
  * files: { name: Uint8Array } added or replaced in the portal
  * removedFiles: Set of base file names the user removed
  */
-export function buildTheme({ name, base = null, profiles = [], edits = null, files = {}, removedFiles = new Set() }) {
+/**
+ * Remove settings, indicator colours, keypad commands and voice prompts that
+ * the given Infinity version would reject. Mutates config/files; returns log lines.
+ */
+export function stripUnsupported(config, files, version) {
+  const log = [];
+  const needs = (kind, n) => `needs Infinity v${rules.minVersion(kind, n)}`;
+  for (const key of Object.keys(config)) {
+    if (!rules.supports(version, "setting", key)) {
+      delete config[key];
+      log.push(`Left out ${key} (${needs("setting", key)})`);
+    }
+  }
+  const colors = config.indicator_color_config;
+  if (isObject(colors)) {
+    for (const type of Object.keys(colors)) {
+      if (!rules.supports(version, "indicator", type)) {
+        delete colors[type];
+        log.push(`Left out indicator_color_config.${type} (${needs("indicator", type)})`);
+      }
+    }
+    if (!Object.keys(colors).length) delete config.indicator_color_config;
+  }
+  const dtmf = config.dtmf_conference_control_commands;
+  if (isObject(dtmf)) {
+    for (const [code, cmd] of Object.entries(dtmf)) {
+      if (typeof cmd === "string" && !rules.supports(version, "dtmf", cmd)) {
+        delete dtmf[code];
+        log.push(`Left out keypad command ${cmd} (${needs("dtmf", cmd)})`);
+      }
+    }
+  }
+  for (const fname of Object.keys(files)) {
+    if (!rules.supports(version, "audio", fname)) {
+      delete files[fname];
+      log.push(`Left out ${fname} (${needs("audio", fname)})`);
+    }
+  }
+  return log;
+}
+
+export function buildTheme({ name, base = null, profiles = [], edits = null, files = {}, removedFiles = new Set(), version = rules.LATEST_VERSION }) {
   const theme = base ? copyTheme(base, name) : newTheme(name);
   let baseConfig = {};
   try {
@@ -155,6 +198,7 @@ export function buildTheme({ name, base = null, profiles = [], edits = null, fil
     log.push(`${fname in theme.files ? "Replaced" : "Added"} ${fname}`);
     theme.files[fname] = data;
   }
+  log.push(...stripUnsupported(config, theme.files, version));
   saveConfig(theme, config);
   return { theme, config, log };
 }
