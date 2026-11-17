@@ -523,6 +523,10 @@ function validateJpg(fname, data, report) {
     const [aw, ah] = rules.PRESENCE_AVATAR_SIZE;
     if (img.width !== aw || img.height !== ah) report.warn(fname, `Presence avatar should be ${aw}x${ah} (got ${img.width}x${img.height}).`);
   }
+  if (fname === rules.NO_POWERPOINT_LIVE_FILE) {
+    const [pw, ph] = rules.NO_POWERPOINT_LIVE_SIZE;
+    if (img.width !== pw || img.height !== ph) report.warn(fname, `PowerPoint Live placeholder should be ${pw}x${ph} like Pexip's default (got ${img.width}x${img.height}).`);
+  }
   if (fname.startsWith("background")) {
     const [bw, bh] = rules.BACKGROUND_SIZE;
     if (img.width !== bw || img.height !== bh) {

@@ -17,7 +17,11 @@ Pexip adds theme settings in new Infinity releases (e.g. `clock_data` and
 4. Refresh splash screen defaults: `site/defaults/theme_screen_defaults_v<NN>.json` (Pexip publishes it at
    `https://docs.pexip.com/files/v<NN>/theme_screen_defaults_v<NN>.json`) and the default images and splash
    SVGs in `site/defaults/base/` from the new Base theme. Update `DEFAULT_CONFIG` in `catalog.js` from the
-   default themeconfig.json shown in the theme docs.
+   default themeconfig.json shown in the theme docs. The Base theme's own `themeconfig.json` goes in
+   `site/defaults/base/` too (`npm test` checks the two agree). Copy only the files the screen defaults and
+   Images slots use, check SVGs for scripts or external links, and update `BLANK_DEFAULT_ICONS` in
+   `catalog.js` if Pexip filled in or emptied a splash icon. `npm test` checks every file the default
+   screens reference is bundled.
 5. Refresh indicator icons from the new Base theme: copy its `icon_notch57tp_*.svg` files into
    `site/defaults/notch/` and update `NOTCH_ICONS` in `rules.js` (and `NOTCH_ICON_INFO` in `catalog.js`)
    if icons were added or removed. `npm test` checks they match.

@@ -160,7 +160,9 @@ test("presence avatar and PowerPoint Live placeholder", () => {
   const r = v({ "themeconfig.json": cfg(), "presence_avatar_image.jpg": jpgBytes(300, 300), "no_powerpoint_live.jpg": jpgBytes(1280, 720) });
   assert.ok(r.ok, messages(r));
   assert.match(messages(r), /Presence avatar should be 128x128/);
-  assert.equal(r.warnings.length, 1, messages(r));
+  assert.match(messages(r), /PowerPoint Live placeholder should be 1920x1080/);
+  assert.equal(r.warnings.length, 2, messages(r));
+  assert.equal(v({ "themeconfig.json": cfg(), "no_powerpoint_live.jpg": jpgBytes(1920, 1080) }).issues.length, 0);
   assert.equal(v({ "themeconfig.json": cfg(), "presence_avatar_image.jpg": jpgBytes(128, 128, 4) }).ok, false, "CMYK rejected");
 });
 

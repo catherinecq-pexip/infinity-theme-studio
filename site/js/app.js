@@ -1291,7 +1291,7 @@ function splashEditor(name) {
           icons.map((file) => h("div", { class: "icon-row" },
             h("span", { class: "icon-thumb" }, previewImg(file, { maxWidth: "100%", maxHeight: "100%" })),
             h("code", { class: "key" }, file),
-            h("span", { class: "muted small" }, file in state.files ? "Custom" : file in build().theme.files ? "From theme ZIP" : "Default"),
+            h("span", { class: "muted small" }, file in state.files ? "Custom" : file in build().theme.files ? "From theme ZIP" : catalog.BLANK_DEFAULT_ICONS.has(file) ? "Default (blank: no icon shown)" : "Default"),
             h("button", { type: "button", class: "btn small-btn", onclick: () => replaceSplashIcon(file) }, "Replace…"),
             file in state.files ? h("button", { type: "button", class: "btn subtle small-btn", onclick: () => { removeFile(file); changed({ rerender: true }); } }, "Use default") : null))) : null,
         h("div", {}, h("h4", {}, "Background"),

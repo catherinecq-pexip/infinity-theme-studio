@@ -1,0 +1,10 @@
+<svg width="500px" height="500px" viewBox="0 0 500 500" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 46.2 (44496) - http://www.bohemiancoding.com/sketch -->
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group" fill="#FFFFFF">
+            <path d="M250,0 C318.857934,0 377.73841,24.4520246 426.643192,73.3568075 C475.547975,122.26159 500,181.142066 500,250 C500,318.857934 475.547975,377.73841 426.643192,426.643192 C377.73841,475.547975 318.857934,500 250,500 C181.142066,500 122.26159,475.547975 73.3568075,426.643192 C24.4520246,377.73841 0,318.857934 0,250 C0,181.142066 24.4520246,122.26159 73.3568075,73.3568075 C122.26159,24.4520246 181.142066,0 250,0 Z" id="Type-something"></path>
+        </g>
+    </g>
+</svg>

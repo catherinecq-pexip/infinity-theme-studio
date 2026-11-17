@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="69px" height="148px" viewBox="0 0 69 148" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 48.1 (47250) - http://www.bohemiancoding.com/sketch -->
+    <title>Shape</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
+        <g id="thermometer" transform="translate(34.500000, 74.000000) rotate(180.000000) translate(-34.500000, -74.000000) translate(7.000000, 7.000000)" stroke="#FFFFFF" stroke-width="14">
+            <path d="M48.8872306,9.13567539 C48.8872306,0.726518395 35.9370295,0 27.5,0 C19.0629705,-1.35235162e-15 6.11276938,0.726518395 6.11276938,9.13567539 L12.2234067,83.8045956 C2.15237738,90.5113553 -2.32976771,102.996207 1.18611057,114.548582 C4.70198886,126.100957 15.3878189,134 27.5,134 C39.6121811,134 50.2980111,126.100957 53.8138894,114.548582 C57.3297677,102.996207 52.8476226,90.5113553 42.7765933,83.8045956 L48.8872306,9.13567539 Z" id="Shape"></path>
+        </g>
+    </g>
+</svg>

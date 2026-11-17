@@ -73,3 +73,34 @@ test("every screen is in exactly one gallery group", () => {
   assert.deepEqual(new Set(all), rules.SPLASH_SCREENS);
   for (const s of all) assert.ok(catalog.SCREEN_NAMES[s], `${s} needs a name`);
 });
+
+test("Pexip's Base assets are bundled for every file the default screens use", async () => {
+  const { readdirSync } = await import("node:fs");
+  const base = new URL("../site/defaults/base/", import.meta.url);
+  const bundled = new Set(readdirSync(base));
+  for (const spec of Object.values(screens)) {
+    const bg = screenBackground(spec);
+    if (bg.path) assert.ok(bundled.has(bg.path), `${bg.path} missing from site/defaults/base`);
+    for (const icon of screenIcons(spec)) assert.ok(bundled.has(icon), `${icon} missing from site/defaults/base`);
+  }
+  for (const slot of catalog.IMAGE_SLOTS) assert.ok(bundled.has(slot.file), `${slot.file} default missing`);
+  // The bundled assets themselves pass the validator (sizes, RGB JPGs, well-formed SVGs).
+  const files = Object.fromEntries([...bundled].filter((f) => f !== "themeconfig.json").map((f) => [f, new Uint8Array(readFileSync(new URL(f, base)))]));
+  const r = validate(theme({ ...files, "themeconfig.json": readFileSync(new URL("themeconfig.json", base)) }));
+  assert.equal(r.errors.length, 0, messages(r));
+  assert.equal(r.warnings.length, 0, messages(r));
+});
+
+test("Base theme settings match the defaults shown in the portal", () => {
+  const baseCfg = JSON.parse(readFileSync(new URL("../site/defaults/base/themeconfig.json", import.meta.url), "utf8").replace(/^\uFEFF/, ""));
+  // The docs also list a few keys Base leaves out (e.g. disable_external_media_proc_indicator); compare what Base sets.
+  for (const [key, value] of Object.entries(baseCfg)) if (key !== "theme_version") assert.deepEqual(catalog.DEFAULT_CONFIG[key], value, key);
+});
+
+test("BLANK_DEFAULT_ICONS lists exactly the empty Base splash icons", async () => {
+  const { readdirSync } = await import("node:fs");
+  const base = new URL("../site/defaults/base/", import.meta.url);
+  const blank = readdirSync(base).filter((f) => f.endsWith(".svg"))
+    .filter((f) => !/<(path|rect|circle|ellipse|line|polyline|polygon|text|use|g)\b/.test(readFileSync(new URL(f, base), "utf8")));
+  assert.deepEqual(new Set(blank), catalog.BLANK_DEFAULT_ICONS);
+});

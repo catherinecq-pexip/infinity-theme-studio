@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="369px" height="386px" viewBox="0 0 369 386" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 48.2 (47327) - http://www.bohemiancoding.com/sketch -->
+    <title>No Camera</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="No-Camera">
+            <g id="Group" transform="translate(9.000000, 9.000000)">
+                <g id="video-off" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="18">
+                    <path d="M238.636364,265.636364 L238.636364,281.545455 C238.636364,299.118151 224.390878,313.363636 206.818182,313.363636 L31.8181818,313.363636 C14.2454852,313.363636 3.53252781e-15,299.118151 0,281.545455 L0,122.454545 C-1.7662639e-15,104.881849 14.2454852,90.6363636 31.8181818,90.6363636 L63.6363636,90.6363636 L238.636364,265.636364 Z M153.681818,90.6363636 L206.818182,90.6363636 C224.390878,90.6363636 238.636364,104.881849 238.636364,122.454545 L238.636364,175.590909 L254.545455,191.5 L350,122.454545 L350,281.545455" id="Shape"></path>
+                    <path d="M1,4 L351,354" id="Shape"></path>
+                </g>
+                <path d="M162,90 L225,95 L237,110 L240,190 L148,98 L162,90 Z M61,92 L221,246 L242,276 L232,308 L168,313 L17,308 L5,285 L5,125 L13,96 L61,92 Z M240,190 L342,132 L342,286 L240,190 Z" id="Path-3" fill="#FFFFFF"></path>
+            </g>
+        </g>
+    </g>
+</svg>

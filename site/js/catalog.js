@@ -235,9 +235,9 @@ export const IMAGE_SLOTS = [
   { file: "presence_avatar_image.jpg", title: "Presence avatar", spec: "JPG (RGB), 128×128",
     help: "Shown next to the meeting alias in legacy Pexip apps, and as the contact avatar in Skype for Business. The corners are cropped to a circle.",
     fit: { w: 128, h: 128, mode: "cover", type: "image/jpeg" } },
-  { file: "no_powerpoint_live.jpg", title: "PowerPoint Live placeholder (Teams)", spec: "JPG (RGB)",
+  { file: "no_powerpoint_live.jpg", title: "PowerPoint Live placeholder (Teams)", spec: "JPG (RGB), 1920×1080",
     help: "Only for calls into Microsoft Teams meetings: shown when a Teams user shares PowerPoint Live, Excel, Whiteboard or other content Infinity can't show.",
-    fit: { mode: "contain", type: "image/jpeg" } },
+    fit: { w: 1920, h: 1080, mode: "contain", type: "image/jpeg" } },
 ];
 
 // ---------------------------------------------------------------------------
@@ -413,6 +413,9 @@ export const GATEWAY_ONLY = {
 };
 
 /** In-conference indicator icons (rules.NOTCH_ICONS): what each one shows. */
+/** Splash icons that are empty in Pexip's Base theme: the screen shows no icon unless you add one. */
+export const BLANK_DEFAULT_ICONS = new Set(["icon_connecting.svg", "icon_error_insufficient_video_licenses.svg", "icon_is_in_lobby.svg", "icon_other_participants_audio_only.svg", "icon_streaming_screen.svg", "icon_timeout.svg", "icon_virtual_reception_conference_id_entry.svg", "icon_virtual_reception_conference_id_invalid.svg", "icon_virtual_reception_connecting.svg", "icon_virtual_reception_welcome.svg", "icon_waiting_for_host.svg", "icon_welcome.svg"]);
+
 export const NOTCH_ICON_INFO = {
   participants: { title: "Participant count", help: "Shown with the number of people in the meeting." },
   audio: { title: "Audio-only participants", help: "Shown with the number of people joined by audio only." },
@@ -500,7 +503,7 @@ export const DEFAULT_CONFIG = {
   disable_watermark_mute_icon: true,
   disable_conference_locked_indicator: false,
   ai_indicator_text: "AI",
-  external_media_proc_indicator_text: "External media processing",
+  external_media_proc_indicator_text: "External Media Processing",
   streaming_indicator_text: "Streaming enabled",
   public_streaming_indicator_text: "Public streaming enabled",
   recording_indicator_text: "Recording",

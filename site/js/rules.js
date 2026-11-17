@@ -220,6 +220,7 @@ export const PRESENCE_AVATAR_FILE = "presence_avatar_image.jpg";
 export const PRESENCE_AVATAR_SIZE = [128, 128];
 /** Shown in Microsoft Teams interop calls when PowerPoint Live or other unsupported content is shared. */
 export const NO_POWERPOINT_LIVE_FILE = "no_powerpoint_live.jpg";
+export const NO_POWERPOINT_LIVE_SIZE = [1920, 1080]; // size of Pexip's Base theme image
 
 /** Base theme SVG files (may be replaced by a file of the same name). */
 export const BASE_SVG_FILES = new Set([
