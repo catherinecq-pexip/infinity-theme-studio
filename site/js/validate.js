@@ -4,6 +4,7 @@
 // Warnings = allowed, but probably a mistake or worth a human check.
 
 import * as rules from "./rules.js";
+import { checkLayout } from "./layouts.js";
 import { jpegInfo, parseXml, pngInfo, sniffFormat, wavInfo } from "./formats.js";
 import { utf8 } from "./package.js";
 
@@ -91,6 +92,19 @@ export function validate(theme, { version = rules.LATEST_VERSION } = {}) {
     validateVersion(config, theme, version, report);
   }
   return report;
+}
+
+/** Custom layouts in a theme: layout name -> parsed JSON (files that don't parse are skipped). */
+export function customLayouts(theme) {
+  const out = {};
+  for (const [fname, data] of Object.entries(theme.files)) {
+    if (!fname.startsWith(rules.CUSTOM_LAYOUT_PREFIX) || !fname.toLowerCase().endsWith(".json")) continue;
+    try {
+      const layout = JSON.parse(utf8.decode(data).replace(/^\uFEFF/, ""));
+      if (typeof layout?.name === "string") out[layout.name] = { ...layout, $file: fname };
+    } catch { /* reported by validate() */ }
+  }
+  return out;
 }
 
 /** Custom layout names defined by custom_layout_*.json files in a theme. */
@@ -478,23 +492,18 @@ function validateJsonFile(fname, data, report) {
 }
 
 function validateCustomLayout(fname, data, report) {
-  report.warn(fname, "Custom layouts require a 'customlayouts' license. Check deep structure with Pexip's layout designer tool.");
+  report.warn(fname, "Custom layouts need a 'customlayouts' licence on your Infinity system.");
   const layout = validateJsonFile(fname, data, report);
   if (!isObject(layout)) {
     if (layout !== null) report.error(fname, "Custom layout must be a JSON object.");
     return null;
   }
-  let name = layout.name;
-  if (typeof name !== "string" || !rules.CUSTOM_LAYOUT_NAME_RE.test(name)) {
-    report.error(fname, "'name' is required: up to 50 letters, digits or underscores, no spaces.");
-    name = null;
+  for (const issue of checkLayout(layout)) {
+    if (issue.level === "error") report.error(fname, issue.message);
+    else report.warn(fname, issue.message);
   }
-  if (!Array.isArray(layout.modes) || !layout.modes.length) {
-    report.error(fname, "'modes' must be a list containing at least one valid mode.");
-  }
-  if (has(layout, "dual_screen_enabled") && typeof layout.dual_screen_enabled !== "boolean") {
-    report.error(fname, "'dual_screen_enabled' must be true or false.");
-  }
+  const name = typeof layout.name === "string" && rules.CUSTOM_LAYOUT_NAME_RE.test(layout.name) ? layout.name : null;
+  if (name && rules.BUILTIN_LAYOUTS.has(name)) report.warn(fname, `'${name}' is also the name of a layout built into Infinity; choose a different name to avoid confusion.`);
   return name;
 }
 

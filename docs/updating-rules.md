@@ -26,6 +26,9 @@ Pexip adds theme settings in new Infinity releases (e.g. `clock_data` and
    `site/defaults/notch/` and update `NOTCH_ICONS` in `rules.js` (and `NOTCH_ICON_INFO` in `catalog.js`)
    if icons were added or removed. `npm test` checks they match.
 6. Describe any new setting, prompt or label in `site/js/catalog.js` so it appears in the portal.
+   Custom layout rules live in `site/js/layouts.js` (`checkLayout`); update them if Pexip changes the layout
+   file format. The meeting preview's positions (watermark offset, footer band, indicator bar) are in
+   `site/js/meeting.js`; built-in layout geometry there is approximate.
    `npm test` fails until every setting in `rules.js` is covered there.
 7. Add tests in `tests/`, run `npm test`, then push to `main` to publish.
 8. Re-check your themes by loading them on the portal's Start step.

@@ -149,7 +149,7 @@ test("custom layout", () => {
 });
 
 test("custom layouts count as known for dtmf_allowed_layouts", () => {
-  const layout = bytes(JSON.stringify({ name: "mine", modes: [{}] }));
+  const layout = bytes(JSON.stringify({ name: "mine", modes: [{ grid_size: [1, 1], constraints: { min_slots: 1, max_slots: 1 }, slots: [{ start_x: 0, start_y: 0, width: 1, is_speaker_slot: true }] }] }));
   const r = v({ "themeconfig.json": cfg({ dtmf_allowed_layouts: ["mine", "2x2"] }), "custom_layout_x.json": layout });
   assert.ok(r.ok, messages(r));
   assert.ok(!messages(r).includes("dtmf_allowed_layouts"), messages(r));
@@ -171,4 +171,15 @@ test("fonts given as CSS-style lists (as in Pexip's defaults)", () => {
   assert.ok(v({ "themeconfig.json": cfg(screen("inter medium,noto-sans,sans")) }).ok);
   assert.ok(v({ "themeconfig.json": cfg(screen("Roboto Condensed")) }).ok);
   assert.equal(v({ "themeconfig.json": cfg(screen("Comic Sans, sans")) }).ok, false);
+});
+
+test("custom layout deep checks (overlaps, built-in name clash)", () => {
+  const slot = (x, y, w, sp) => ({ start_x: x, start_y: y, width: w, ...(sp ? { is_speaker_slot: true } : {}) });
+  const bad = { name: "mine", modes: [{ grid_size: [2, 2], constraints: { min_slots: 1, max_slots: 2 }, slots: [slot(0, 0, 2, true), slot(1, 1, 1)] }] };
+  const r = v({ "themeconfig.json": cfg(), "custom_layout_x.json": bytes(JSON.stringify(bad)) });
+  assert.match(messages(r), /overlaps slot 1/);
+  const clash = { ...bad, name: "one_main_twelve_around", modes: [{ grid_size: [1, 1], constraints: { min_slots: 1, max_slots: 1 }, slots: [slot(0, 0, 1, true)] }] };
+  const c = v({ "themeconfig.json": cfg(), "custom_layout_x.json": bytes(JSON.stringify(clash)) });
+  assert.ok(c.ok, messages(c));
+  assert.match(messages(c), /built into Infinity/);
 });

@@ -8,12 +8,14 @@ import * as catalog from "./catalog.js";
 import { buildTheme, Edits, getPath } from "./build.js";
 import { loadConfig, toZip, utf8 } from "./package.js";
 import { inspectZip, slug } from "./branding.js";
-import { customLayoutNames, describeJsonError, validate } from "./validate.js";
+import { customLayoutNames, customLayouts, describeJsonError, validate } from "./validate.js";
 import { AUDIO_SOURCE_EXTENSIONS, toInfinityWav, wavDuration } from "./audio.js";
 import { fitImage, objectUrl } from "./imaging.js";
 import { sniffFormat, jpegInfo, pngInfo } from "./formats.js";
 import { checkNotchSvg, makeDarkVariant, notchFile } from "./icons.js";
 import { effectiveScreens, layoutScreen, screenBackground, screenIcons, screenLabels, SCREEN_H, SCREEN_W } from "./splash.js";
+import { checkLayout, layoutFileName, TEMPLATES, WATERMARK_POSITIONS } from "./layouts.js";
+import { FOOTER_H as MEETING_FOOTER_H, H as MEETING_H, meetingTiles, W as MEETING_W, watermarkRect } from "./meeting.js";
 
 // ---------------------------------------------------------------------------
 // State
@@ -50,6 +52,12 @@ const state = {
   screenDefaults: null,   // Pexip's splash screen defaults (defaults/theme_screen_defaults_v41.json)
   splashScreen: "welcome",// screen open in the Splash screens editor
   splashGuide: false,     // show the 4:3 crop guide
+  meeting: {              // meeting preview scenario (never written to the theme)
+    dock: true, big: false, controls: false, layout: "1:7", participants: 6, level: null,
+    recording: true, streaming: false, transcribing: false, captions: false, ai: false,
+    locked: false, waiting: 2, hand: true, cameraOff: false, muted: false, light: false,
+  },
+  layoutEdit: null,       // custom layout being edited: { file, savedName, draft, list, mode, sel, unsaved }
   version: loadVersion(), // Infinity version the theme is for
 };
 
@@ -701,6 +709,7 @@ const SETTINGS_TABS = [
   ["clock", "Clock & timer"],
   ["keypad", "Keypad"],
   ["wording", "Splash screens"],
+  ["layouts", "Custom layouts"],
   ["advanced", "Advanced"],
 ];
 
@@ -718,6 +727,7 @@ RENDERERS.settings = () => {
     tabs,
     box,
     SETTINGS_PANES[state.settingsTab](),
+    ["wording", "layouts", "advanced"].includes(state.settingsTab) ? null : meetingDock(),
   );
 };
 
@@ -760,13 +770,7 @@ function indicatorCard(ind) {
     const hidden = ind.hide && cfg[ind.hide] === true;
     const icon = ind.notch[0];
     for (const [el, cc, dark] of [[preview, c, true], [lightPreview, c?.light_mode, false]]) {
-      el.replaceChildren(...[
-        icon ? h("img", { src: notchSrc(notchFile(icon, dark)), alt: "", class: "chip-icon" }) : null,
-        label ? h("span", {}, label) : null,
-      ].filter(Boolean));
-      el.style.background = cssColor(cc?.background, "rgba(0,0,0,.7)");
-      el.style.borderColor = cssColor(cc?.border, "rgba(0,0,0,.7)");
-      el.style.color = cssColor(cc?.text, "#fff");
+      paintChip(el, { icon, label, colors: cc, light: !dark });
       el.classList.toggle("hidden-ind", Boolean(hidden));
     }
     lightPreview.style.display = c?.light_mode ? "" : "none";
@@ -908,15 +912,15 @@ SETTINGS_PANES.classification = () => {
     const updateBanner = () => {
       const cur = levelParts(current().classification?.levels?.[key]);
       banner.textContent = cur.text || "(empty)";
-      banner.style.color = cssColor(cur.color, "#fff");
-      banner.style.background = cssColor(cur.bgcolor, "#3b3b3b");
+      banner.style.color = cssColor(cur.color, "#1a1a1a");
+      banner.style.background = cssColor(cur.bgcolor, "#f2f2f2");
     };
     previewUpdaters.push(updateBanner);
     updateBanner();
     const colorInput = (prop, label) => {
       const c = parseColor(p[prop]);
       const picker = h("input", {
-        type: "color", value: c?.rgb ?? (prop === "color" ? "#ffffff" : "#3b3b3b"), "aria-label": `${label} for level ${key}`,
+        type: "color", value: c?.rgb ?? (prop === "color" ? "#1a1a1a" : "#f2f2f2"), "aria-label": `${label} for level ${key}`,
         oninput: (e) => { setLevel(key, { [prop]: formatColor(e.target.value, 255) }); clear.disabled = false; changed(); },
       });
       const clear = h("button", {
@@ -1172,7 +1176,7 @@ SETTINGS_PANES.keypad = () => {
         }),
         h("span", {}, catalog.LAYOUT_LABELS[l] ?? `Custom: ${l}`),
         h("code", { class: "key" }, l)))) : null,
-      limit && !customLayouts.length ? h("p", { class: "muted small" }, "Custom layouts from your theme (custom_layout_*.json, added in the Images step) also appear here. Design them with ", docsLink("Pexip's layout designer", catalog.DOCS.layoutDesigner), ".") : null),
+      limit && !customLayouts.length ? h("p", { class: "muted small" }, "Custom layouts from your theme also appear here. Design them in the ", h("button", { type: "button", class: "linklike", onclick: () => { state.settingsTab = "layouts"; renderMain({ resetScroll: true }); } }, "Custom layouts"), " tab.") : null),
   );
 };
 
@@ -1320,6 +1324,526 @@ SETTINGS_PANES.wording = () => {
       }, screenPreview(name, 0.13), h("span", { class: "screen-name" }, catalog.SCREEN_NAMES[name] ?? name)))))),
     customKeys.length ? section("Custom labels in your theme", "Extra labels defined by your branding ZIP's splash screen layouts.",
       h("div", { class: "fields two" }, customKeys.map((key) => textField(["splash_screens", "labels", key], key, { multiline: true })))) : null,
+  );
+};
+
+// In-meeting preview
+
+const MEETING_NAMES = ["Alex", "Sam", "Priya", "Jordan", "Mei", "Lars", "Ana", "Kofi", "Noor", "Tom", "Ines", "Ravi", "Zoe",
+  "Omar", "Elin", "Luca", "Hana", "Ben", "Maya", "Femi", "Ida", "Yuki", "Leo", "Sara", "Nils", "Ada"];
+const TILE_HUES = [212, 25, 160, 280, 340, 95, 190, 50];
+const SILHOUETTE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90"><circle cx="80" cy="36" r="17" fill="#fff" fill-opacity=".28"/><path d="M46 90c2-22 16-33 34-33s32 11 34 33z" fill="#fff" fill-opacity=".28"/></svg>')}`;
+const MEETING_TOGGLES = [
+  ["recording", "Recording"], ["streaming", "Streaming"], ["transcribing", "Transcribing"], ["captions", "Live captions"],
+  ["ai", "AI"], ["locked", "Meeting locked"], ["hand", "Raised hand"], ["cameraOff", "Someone's camera is off"],
+  ["muted", "You're muted by an admin"], ["light", "Light indicator bar"],
+];
+
+/** Indicator wording as Infinity would show it: the theme's text, else Infinity's default. "" = icon only. */
+function indicatorText(key, fallback) {
+  const v = current()[key];
+  if (v === "") return "";
+  return typeof v === "string" ? v : catalog.DEFAULT_CONFIG[key] ?? fallback;
+}
+
+/** Fill an indicator chip (icon + text) with its colours. Shared by the Indicators cards and the meeting preview. */
+function paintChip(el, { icon, label, colors, light = false }) {
+  const fb = light ? DEFAULT_LIGHT : DEFAULT_INDICATOR;
+  el.replaceChildren(...[
+    icon ? h("img", { src: notchSrc(notchFile(icon, !light)), alt: "", class: "chip-icon" }) : null,
+    label ? h("span", {}, label) : null,
+  ].filter(Boolean));
+  el.style.background = cssColor(colors?.background ?? fb.background);
+  el.style.borderColor = cssColor(colors?.border ?? fb.border);
+  el.style.color = cssColor(colors?.text ?? fb.text);
+}
+
+/** Items in the indicator bar for the current scenario. */
+function meetingIndicators(sc, avatars) {
+  const cfg = current();
+  const byId = Object.fromEntries(catalog.INDICATORS.map((i) => [i.id, i]));
+  const shown = (id) => !(byId[id].hide && cfg[byId[id].hide] === true);
+  const colors = (id) => cfg.indicator_color_config?.[byId[id].color];
+  const items = [{ icon: "participants", label: String(sc.participants) }];
+  if (sc.cameraOff && !avatars) items.push({ icon: "video_muted", label: "1" });
+  if (sc.hand) items.push({ icon: "raised_hand", label: "1", colors: colors("hand_raised") });
+  if (sc.locked && shown("locked")) {
+    const label = sc.waiting > 0
+      ? indicatorText("conference_locked_indicator_n_waiting_text", "{number_of_waiting_participants} waiting").replaceAll("{number_of_waiting_participants}", String(sc.waiting))
+      : indicatorText("conference_locked_indicator_text", "Conference locked");
+    items.push({ icon: "conference_locked", label, colors: colors("locked") });
+  }
+  for (const [flag, id, key, icon] of [
+    ["recording", "recording", "recording_indicator_text", "recording"],
+    ["streaming", "streaming", "streaming_indicator_text", "streaming"],
+    ["transcribing", "transcribing", "transcribing_indicator_text", "transcribing"],
+    ["captions", "captions", "live_captions_on_indicator_text", "live_captions"],
+    ["ai", "ai", "ai_indicator_text", "ai"],
+  ]) {
+    if (sc[flag] && shown(id)) items.push({ icon, label: indicatorText(key, byId[id].title), colors: colors(id) });
+  }
+  return items;
+}
+
+const initials = (name) => name.slice(0, 2).toUpperCase();
+
+/** A 1920x1080 mock-up of a meeting using the theme, scaled to fit. Redraws on every change. */
+function meetingPreview(scale) {
+  const outer = h("div", { class: "screen-frame meeting-frame", style: { width: `${MEETING_W * scale}px`, height: `${MEETING_H * scale}px` } });
+  const draw = () => {
+    const cfg = current();
+    const sc = state.meeting;
+    const customs = customLayouts(build().theme);
+    const custom = customs[sc.layout];
+    const avatars = cfg.enable_avatars_in_mix === true;
+    const light = custom?.notch_color ? custom.notch_color === "light" : sc.light;
+    const videoCount = Math.max(1, sc.participants - (sc.cameraOff && !avatars ? 1 : 0));
+    const tiles = meetingTiles(sc.layout, videoCount, customs);
+    const stage = h("div", { class: "screen meeting", style: { transform: `scale(${scale})`, background: custom?.background_color ?? "#0b0b0b" } });
+    const speaker = cfg.indicator_color_config?.speaker;
+    tiles.forEach((t, i) => {
+      const name = MEETING_NAMES[i % MEETING_NAMES.length];
+      const isAvatar = avatars && sc.cameraOff && i === tiles.length - 1;
+      const hue = TILE_HUES[i % TILE_HUES.length];
+      const tile = h("div", {
+        class: "m-tile",
+        style: { left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px`, background: `linear-gradient(160deg, hsl(${hue} 22% 40%), hsl(${hue} 28% 16%))` },
+      });
+      if (isAvatar) {
+        const size = Math.min(t.w, t.h) * 0.42;
+        tile.append(
+          previewImg("background_avatar_in_mix.jpg", { position: "absolute", inset: "0", width: "100%", height: "100%", objectFit: "cover" }, { quiet: true }),
+          h("div", { class: "m-avatar", style: { width: `${size}px`, height: `${size}px`, fontSize: `${size * 0.38}px`, background: cssColor(cfg.avatar_in_mix_shape_color, "rgba(220, 220, 220, .2)"), color: cssColor(cfg.avatar_in_mix_text_color, "#f7f7f7") } }, initials(name)));
+      } else {
+        tile.append(h("img", { src: SILHOUETTE, alt: "", class: "m-silhouette" }));
+      }
+      tile.append(h("span", { class: "m-name", style: { fontSize: `${Math.max(20, Math.min(30, t.h * 0.07))}px` } }, name));
+      if (t.main && speaker?.border) tile.style.boxShadow = `inset 0 0 0 6px ${cssColor(speaker.border)}`;
+      stage.append(tile);
+    });
+
+    if (cfg.disable_watermark_icon !== true) {
+      const r = watermarkRect(tiles, custom?.watermark_position);
+      stage.append(previewImg("watermark_icon.png", { position: "absolute", left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`, objectFit: "contain", objectPosition: "left top" }, { quiet: true }));
+    }
+    if (sc.layout === "1:33") {
+      stage.append(h("div", { class: "m-footer", style: { height: `${MEETING_FOOTER_H}px` } },
+        previewImg("watermark_footer_icon.png", { width: "200px", height: "100px", objectFit: "contain" }, { quiet: true })));
+    }
+
+    // Top of the screen: classification banner, then the indicator bar, then the muted overlay.
+    const top = h("div", { class: "m-top" });
+    const cls = cfg.classification;
+    if (cls?.levels && typeof cls.levels === "object") {
+      const level = cls.levels[sc.level ?? cls.default] ?? Object.values(cls.levels)[0];
+      const p = levelParts(level);
+      if (p.text) top.append(h("div", { class: "m-banner", style: { color: cssColor(p.color, "#1a1a1a"), background: cssColor(p.bgcolor, "#f2f2f2") } }, p.text));
+    }
+    const bar = h("div", { class: `m-notch ${light ? "light" : ""}` });
+    for (const item of meetingIndicators(sc, avatars)) {
+      const chip = h("span", { class: "m-chip" });
+      paintChip(chip, { ...item, colors: light ? item.colors?.light_mode : item.colors, light });
+      bar.append(chip);
+    }
+    top.append(bar);
+    const muteHidden = (cfg.disable_watermark_mute_icon ?? catalog.DEFAULT_CONFIG.disable_watermark_mute_icon) !== false;
+    if (sc.muted && !muteHidden) top.append(previewImg("watermark_mute_icon.png", { width: "200px", height: "100px", objectFit: "contain" }, { quiet: true }));
+    stage.append(top);
+
+    if (cfg.clock_data && ok("setting", "clock_data")) stage.append(h("div", { class: "m-clock" }, clockSample(cfg.clock_data)));
+    outer.replaceChildren(stage);
+  };
+  previewUpdaters.push(draw);
+  draw();
+  return outer;
+}
+
+/** Scenario controls for the meeting preview. They only change the preview, never the theme. */
+function meetingControls() {
+  const sc = state.meeting;
+  const cfg = current();
+  const customs = customLayouts(build().theme);
+  const refresh = () => previewUpdaters.forEach((fn) => fn());
+  const layoutId = nextId();
+  const options = [
+    ...Object.entries(catalog.LAYOUT_LABELS).map(([k, label]) => [k, label]),
+    ...Object.keys(customs).filter((k) => !(k in catalog.LAYOUT_LABELS)).map((k) => [k, `Custom: ${k}`]),
+  ];
+  const count = h("output", { class: "m-count" }, String(sc.participants));
+  const waiting = h("input", {
+    type: "number", min: 0, max: 99, value: sc.waiting, disabled: !sc.locked, class: "m-waiting", "aria-label": "People waiting",
+    oninput: (e) => { sc.waiting = Math.max(0, Number(e.target.value) || 0); refresh(); },
+  });
+  const cls = cfg.classification?.levels && typeof cfg.classification.levels === "object" ? cfg.classification : null;
+  const customLight = customs[sc.layout]?.notch_color;
+  const muteHidden = (cfg.disable_watermark_mute_icon ?? catalog.DEFAULT_CONFIG.disable_watermark_mute_icon) !== false;
+  return h("div", { class: "m-controls" },
+    h("label", { for: layoutId }, "Layout ",
+      h("select", { id: layoutId, value: sc.layout, onchange: (e) => { sc.layout = e.target.value; renderMain(); } },
+        options.map(([k, label]) => h("option", { value: k }, label)))),
+    h("label", {}, "People ",
+      h("input", { type: "range", min: 1, max: 26, value: sc.participants, oninput: (e) => { sc.participants = Number(e.target.value); count.textContent = e.target.value; refresh(); } }),
+      count),
+    cls ? h("label", {}, "Banner ",
+      h("select", { value: String(sc.level ?? cls.default), onchange: (e) => { sc.level = e.target.value; refresh(); } },
+        Object.entries(cls.levels).map(([k, v]) => h("option", { value: k }, levelParts(v).text || `Level ${k}`)))) : null,
+    h("div", { class: "m-toggles" }, MEETING_TOGGLES.map(([key, label]) => {
+      const disabled = key === "light" && Boolean(customLight);
+      return h("label", { class: "check-item", title: disabled ? `This layout sets notch_color: ${customLight}` : key === "muted" && muteHidden ? "The muted overlay is hidden (Settings → General)" : null },
+        h("input", {
+          type: "checkbox", checked: key === "light" && customLight ? customLight === "light" : sc[key], disabled,
+          onchange: (e) => { sc[key] = e.target.checked; waiting.disabled = !sc.locked; refresh(); },
+        }),
+        ` ${label}`,
+        key === "locked" ? h("span", { class: "muted small" }, " · waiting ", waiting) : null,
+        key === "muted" && muteHidden ? h("span", { class: "muted small" }, " (overlay hidden)") : null);
+    })));
+}
+
+/** Floating preview shown on the Settings and Images steps. */
+function meetingDock() {
+  const sc = state.meeting;
+  if (!sc.dock) {
+    return h("button", { type: "button", class: "meeting-dock-tab", onclick: () => { sc.dock = true; renderMain(); } }, "Show meeting preview");
+  }
+  return h("aside", { class: `meeting-dock ${sc.big ? "big" : ""}`, "aria-label": "Meeting preview" },
+    h("div", { class: "meeting-dock-head" },
+      h("strong", {}, "Meeting preview"),
+      h("span", { class: "muted small" }, "approximate"),
+      h("span", { class: "spacer" }),
+      h("button", { type: "button", class: `btn subtle small-btn ${sc.controls ? "active" : ""}`, "aria-expanded": String(sc.controls), onclick: () => { sc.controls = !sc.controls; renderMain(); } }, "Scenario"),
+      h("button", { type: "button", class: "icon-btn", title: sc.big ? "Smaller" : "Bigger", onclick: () => { sc.big = !sc.big; renderMain(); } }, sc.big ? "–" : "+"),
+      h("button", { type: "button", class: "icon-btn", title: "Hide preview", onclick: () => { sc.dock = false; renderMain(); } }, "✕")),
+    sc.controls ? meetingControls() : null,
+    meetingPreview(sc.big ? 0.3 : 0.2));
+}
+
+// Custom layouts
+
+const clone = (v) => JSON.parse(JSON.stringify(v));
+
+function uniqueLayoutName(base, taken) {
+  let name = base.slice(0, 50);
+  for (let i = 2; taken.has(name) || rules.BUILTIN_LAYOUTS.has(name); i++) name = `${base.slice(0, 46)}_${i}`;
+  return name;
+}
+
+/** Rename / add / remove a layout name in dtmf_allowed_layouts. */
+function updateAllowedLayouts(oldName, newName) {
+  const list = current().dtmf_allowed_layouts;
+  if (!Array.isArray(list) || !list.includes(oldName)) return;
+  state.edits.replace(["dtmf_allowed_layouts"], newName ? list.map((l) => (l === oldName ? newName : l)) : list.filter((l) => l !== oldName));
+}
+
+function openLayout(layout, file) {
+  const { $file, ...draft } = clone(layout);
+  state.layoutEdit = { file, savedName: file ? draft.name : null, draft, list: "modes", mode: 0, sel: null, unsaved: false };
+}
+
+/** Write the draft into the theme if it has no errors. */
+function saveLayoutDraft() {
+  const ed = state.layoutEdit;
+  const d = ed.draft;
+  const file = layoutFileName(d.name);
+  const clash = file !== ed.file && typeof d.name === "string" && file in build().theme.files;
+  if (clash || checkLayout(d).some((i) => i.level === "error")) { ed.unsaved = true; return false; }
+  if (ed.file && ed.file !== file) removeFile(ed.file);
+  if (ed.savedName && ed.savedName !== d.name) updateAllowedLayouts(ed.savedName, d.name);
+  setFile(file, utf8.encode(`${JSON.stringify(d, null, 2)}\n`));
+  Object.assign(ed, { file, savedName: d.name, unsaved: false });
+  return true;
+}
+
+function layoutChanged() {
+  saveLayoutDraft();
+  changed({ rerender: true });
+}
+
+const modeRange = (m) => {
+  const c = m?.constraints ?? {};
+  return c.min_slots === c.max_slots ? `${c.min_slots ?? "?"}` : `${c.min_slots ?? "?"}–${c.max_slots ?? "?"}`;
+};
+
+/** Keep max_slots equal to the number of slots (as Infinity requires) and min ≤ max. */
+function syncConstraints(m) {
+  m.constraints ??= { min_slots: 1, max_slots: 1 };
+  m.constraints.max_slots = Math.max(1, m.slots.length);
+  if (m.constraints.min_slots > m.constraints.max_slots) m.constraints.min_slots = m.constraints.max_slots;
+}
+
+function layoutCanvas(m, pres, issues) {
+  const ed = state.layoutEdit;
+  const n = m.grid_size?.[0] ?? 1;
+  const CW = 640;
+  const CH = 360;
+  const occupied = (x, y, w, skip = -1) => m.slots.some((s, i) => i !== skip && x < s.start_x + s.width && s.start_x < x + w && y < s.start_y + s.width && s.start_y < y + w);
+  const canvas = h("div", {
+    class: "layout-canvas", style: { width: `${CW}px`, height: `${CH}px`, backgroundSize: `${CW / n}px ${CH / n}px` },
+    title: "Drag across empty cells to add a slot",
+  });
+  canvas.style.backgroundSize = `${CW / n}px ${CH / n}px`;
+  const bad = new Set(issues.filter((i) => i.list === ed.list && i.mode === ed.mode && i.slot !== undefined).map((i) => i.slot));
+  m.slots.forEach((s, i) => {
+    canvas.append(h("button", {
+      type: "button",
+      class: `layout-slot ${s.is_speaker_slot ? "speaker" : ""} ${s.is_presentation_slot ? "pres" : ""} ${ed.sel === i ? "sel" : ""} ${bad.has(i) ? "bad" : ""}`,
+      style: { left: `${(s.start_x * CW) / n}px`, top: `${(s.start_y * CH) / n}px`, width: `${(s.width * CW) / n}px`, height: `${(s.width * CH) / n}px` },
+      title: `Slot ${i + 1}${s.is_presentation_slot ? " (presentation)" : s.is_speaker_slot ? " (speaker)" : ""}`,
+      onclick: (e) => { e.stopPropagation(); ed.sel = ed.sel === i ? null : i; renderMain(); },
+    }, h("span", {}, String(i + 1)), s.is_presentation_slot ? h("small", {}, "Presentation") : s.is_speaker_slot ? h("small", {}, "Speaker") : null));
+  });
+  // Drag to draw a square slot.
+  let start = null;
+  const ghost = h("div", { class: "layout-ghost", hidden: true });
+  canvas.append(ghost);
+  const cellAt = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return [Math.min(n - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * n))), Math.min(n - 1, Math.max(0, Math.floor(((e.clientY - r.top) / r.height) * n)))];
+  };
+  const square = ([cx, cy]) => {
+    const [sx, sy] = start;
+    let w = Math.max(Math.abs(cx - sx), Math.abs(cy - sy)) + 1;
+    w = Math.min(w, cx >= sx ? n - sx : sx + 1, cy >= sy ? n - sy : sy + 1);
+    return { start_x: cx >= sx ? sx : sx - w + 1, start_y: cy >= sy ? sy : sy - w + 1, width: w };
+  };
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.target !== canvas) return;
+    const c = cellAt(e);
+    if (occupied(c[0], c[1], 1)) return;
+    start = c;
+    canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!start) return;
+    const s = square(cellAt(e));
+    Object.assign(ghost.style, { left: `${(s.start_x * CW) / n}px`, top: `${(s.start_y * CH) / n}px`, width: `${(s.width * CW) / n}px`, height: `${(s.width * CH) / n}px` });
+    ghost.classList.toggle("bad", occupied(s.start_x, s.start_y, s.width));
+    ghost.hidden = false;
+  });
+  canvas.addEventListener("pointerup", (e) => {
+    if (!start) return;
+    const s = square(cellAt(e));
+    start = null;
+    ghost.hidden = true;
+    if (occupied(s.start_x, s.start_y, s.width)) { toast("Slots can't overlap.", "error"); return; }
+    if (m.slots.length >= rules.CUSTOM_LAYOUT_MAX_SLOTS) { toast(`A mode can have up to ${rules.CUSTOM_LAYOUT_MAX_SLOTS} slots.`, "error"); return; }
+    const participantSlots = m.slots.filter((x) => !x.is_presentation_slot).length;
+    if (pres && !m.slots.length) s.is_presentation_slot = true;
+    else if (!participantSlots) s.is_speaker_slot = true;
+    m.slots.push(s);
+    syncConstraints(m);
+    ed.sel = m.slots.length - 1;
+    layoutChanged();
+  });
+  canvas.addEventListener("pointercancel", () => { start = null; ghost.hidden = true; });
+  return canvas;
+}
+
+function slotPanel(m, pres) {
+  const ed = state.layoutEdit;
+  const i = ed.sel;
+  const s = m.slots[i];
+  if (!s) return h("p", { class: "muted small" }, "Drag across empty cells to add a slot. Slots fill in number order as people join, so put the speaker first. Click a slot to change it.");
+  const move = (d) => {
+    const j = i + d;
+    [m.slots[i], m.slots[j]] = [m.slots[j], m.slots[i]];
+    ed.sel = j;
+    layoutChanged();
+  };
+  return h("div", { class: "slot-panel" },
+    h("strong", {}, `Slot ${i + 1}`), h("span", { class: "muted small" }, ` ${s.width}×${s.width} cells at column ${s.start_x + 1}, row ${s.start_y + 1}`),
+    h("div", { class: "row" },
+      h("button", { type: "button", class: "btn small-btn", disabled: i === 0, onclick: () => move(-1) }, "← Earlier"),
+      h("button", { type: "button", class: "btn small-btn", disabled: i === m.slots.length - 1, onclick: () => move(1) }, "Later →"),
+      h("label", { class: "toggle small" }, h("input", { type: "checkbox", checked: Boolean(s.is_speaker_slot), onchange: (e) => { if (e.target.checked) s.is_speaker_slot = true; else delete s.is_speaker_slot; layoutChanged(); } }), " Speaker slot"),
+      pres ? h("label", { class: "toggle small" }, h("input", { type: "checkbox", checked: Boolean(s.is_presentation_slot), onchange: (e) => { if (e.target.checked) s.is_presentation_slot = true; else delete s.is_presentation_slot; layoutChanged(); } }), " Presentation") : null,
+      h("button", { type: "button", class: "btn subtle small-btn", onclick: () => { m.slots.splice(i, 1); syncConstraints(m); ed.sel = null; layoutChanged(); } }, "Delete slot")));
+}
+
+function layoutEditor() {
+  const ed = state.layoutEdit;
+  const d = ed.draft;
+  if (ed.list === "pres_modes" && !Array.isArray(d.pres_modes)) ed.list = "modes";
+  const pres = ed.list === "pres_modes";
+  const modes = d[ed.list];
+  ed.mode = Math.min(ed.mode, Math.max(0, modes.length - 1));
+  const m = modes[ed.mode];
+  const issues = checkLayout(d);
+  const file = layoutFileName(d.name);
+  const clash = file !== ed.file && file in build().theme.files;
+  const errors = issues.filter((i) => i.level === "error");
+  const nameId = nextId();
+  const gridId = nextId();
+  const minId = nextId();
+  const padId = nextId();
+  const allowed = current().dtmf_allowed_layouts;
+  const inCycle = Array.isArray(allowed) && allowed.includes(d.name);
+  const opt = (key, value) => { if (value === "" || value === undefined) delete d[key]; else d[key] = value; layoutChanged(); };
+
+  return h("section", { class: "card layout-editor" },
+    h("div", { class: "slot-head" },
+      h("h3", {}, "Editing ", h("code", { class: "key" }, ed.file ?? file)),
+      h("span", { class: `badge ${ed.unsaved || clash ? "warn" : "good"}` }, ed.unsaved || clash ? "Not saved: fix the problems below" : "Saved in your theme"),
+      h("button", { type: "button", class: "btn subtle small-btn", onclick: () => { state.layoutEdit = null; renderMain(); } }, "Close")),
+    h("div", { class: "fields two" },
+      field("Layout name", "name", h("input", {
+        id: nameId, type: "text", value: d.name ?? "", maxlength: 50, spellcheck: "false",
+        onchange: (e) => { d.name = e.target.value.trim(); layoutChanged(); },
+      }), "Letters, digits and _ only. This is the name you choose on a meeting room or in the API.", nameId),
+      clash ? h("p", { class: "notice-inline" }, `Another layout in your theme is already called ${d.name}.`) : null),
+    h("div", { class: "layout-lists" },
+      h("label", { class: "toggle" }, h("input", {
+        type: "checkbox", checked: Array.isArray(d.pres_modes),
+        onchange: (e) => {
+          if (e.target.checked) {
+            d.pres_modes = [{ grid_size: [4, 4], constraints: { min_slots: 1, max_slots: 4 }, slots: [
+              { start_x: 0, start_y: 0, width: 3, is_presentation_slot: true }, { start_x: 3, start_y: 0, width: 1, is_speaker_slot: true },
+              { start_x: 3, start_y: 1, width: 1 }, { start_x: 3, start_y: 2, width: 1 }] }];
+            ed.list = "pres_modes";
+          } else {
+            delete d.pres_modes;
+            ed.list = "modes";
+          }
+          ed.mode = 0; ed.sel = null;
+          layoutChanged();
+        },
+      }), " Different layout while someone is presenting"),
+      Array.isArray(d.pres_modes) ? h("div", { class: "seg" },
+        [["modes", "Normal"], ["pres_modes", "While presenting"]].map(([k, label]) => h("button", {
+          type: "button", class: `seg-btn ${ed.list === k ? "active" : ""}`, "aria-pressed": String(ed.list === k),
+          onclick: () => { ed.list = k; ed.mode = 0; ed.sel = null; renderMain(); },
+        }, label))) : null),
+    h("div", { class: "tabs mode-tabs" },
+      modes.map((mm, i) => h("button", {
+        type: "button", class: `tab ${ed.mode === i ? "active" : ""}`,
+        onclick: () => { ed.mode = i; ed.sel = null; renderMain(); },
+      }, `${modeRange(mm)} ${mm?.constraints?.max_slots === 1 ? "person" : "people"}`)),
+      h("button", {
+        type: "button", class: "tab", title: "Add a layout for more people",
+        onclick: () => {
+          const last = modes.at(-1);
+          const next = Math.min(rules.CUSTOM_LAYOUT_MAX_SLOTS, (last?.constraints?.max_slots ?? 0) + 1);
+          modes.push({ grid_size: [...(last?.grid_size ?? [4, 4])], constraints: { min_slots: next, max_slots: next }, slots: [] });
+          ed.mode = modes.length - 1; ed.sel = null;
+          layoutChanged();
+        },
+      }, "+ Add")),
+    m ? h("div", { class: "layout-body" },
+      h("div", {},
+        layoutCanvas(m, pres, issues),
+        slotPanel(m, pres)),
+      h("div", { class: "layout-side" },
+        field("Grid", "grid_size", h("select", {
+          id: gridId, value: String(m.grid_size?.[0] ?? 4),
+          onchange: (e) => {
+            const g = Number(e.target.value);
+            const before = m.slots.length;
+            m.grid_size = [g, g];
+            m.slots = m.slots.filter((s) => s.start_x + s.width <= g && s.start_y + s.width <= g);
+            if (m.slots.length < before) toast(`${before - m.slots.length} slot(s) didn't fit and were removed.`, "info");
+            syncConstraints(m); ed.sel = null;
+            layoutChanged();
+          },
+        }, Array.from({ length: rules.CUSTOM_LAYOUT_MAX_GRID }, (_, i) => h("option", { value: String(i + 1) }, `${i + 1} × ${i + 1}`))), null, gridId),
+        field("Used from", "constraints.min_slots", h("input", {
+          id: minId, type: "number", min: 1, max: m.constraints?.max_slots ?? 1, value: m.constraints?.min_slots ?? 1,
+          onchange: (e) => { m.constraints.min_slots = Math.max(1, Math.min(Number(e.target.value) || 1, m.constraints.max_slots)); layoutChanged(); },
+        }), `people, up to ${m.constraints?.max_slots ?? "?"} (one per slot${pres ? ", including the presentation" : ""}).`, minId),
+        field("Gap between slots", "slot_padding", h("input", {
+          id: padId, type: "number", min: 0, max: 0.1, step: 0.001, value: m.slot_padding ?? "", placeholder: "0.001 (default)",
+          onchange: (e) => { if (e.target.value === "") delete m.slot_padding; else m.slot_padding = Number(e.target.value); layoutChanged(); },
+        }), "0 to 0.1", padId),
+        modes.length > 1 ? h("button", { type: "button", class: "btn subtle small-btn", onclick: () => { modes.splice(ed.mode, 1); ed.mode = 0; ed.sel = null; layoutChanged(); } }, "Remove this mode") : null)) : null,
+    errors.length || issues.length ? h("div", { class: "issues-inline" }, issues.map((i) => h("div", { class: `issue ${i.level}` },
+      h("span", { class: "issue-level" }, i.level === "error" ? "Error" : "Warning"), h("span", { class: "issue-msg" }, i.message)))) : null,
+    h("h4", {}, "Options"),
+    h("div", { class: "fields three" },
+      field("Background colour", "background_color", h("span", { class: "row" },
+        h("input", { type: "color", value: d.background_color ?? "#000000", onchange: (e) => opt("background_color", e.target.value), "aria-label": "Background colour" }),
+        d.background_color ? h("button", { type: "button", class: "icon-btn", title: "Use default", onclick: () => opt("background_color") }, "✕") : h("span", { class: "muted small" }, "Default")), "Shows in cells with no slot."),
+      field("Watermark", "watermark_position", h("select", { value: d.watermark_position ?? "", onchange: (e) => opt("watermark_position", e.target.value) },
+        h("option", { value: "" }, "On the main speaker (default)"), WATERMARK_POSITIONS.map((p) => h("option", { value: p }, p.replace("-", " "))))),
+      field("Indicator bar", "notch_color", h("select", { value: d.notch_color ?? "", onchange: (e) => opt("notch_color", e.target.value) },
+        h("option", { value: "" }, "Dark (default)"), h("option", { value: "dark" }, "Dark"), h("option", { value: "light" }, "Light (uses indicators' light colours)"))),
+      field("Self view", "remove_self", h("select", { value: d.remove_self === false ? "false" : "", onchange: (e) => opt("remove_self", e.target.value === "false" ? false : undefined) },
+        h("option", { value: "" }, "Not in the layout (default)"), h("option", { value: "false" }, "Include yourself"))),
+      field("Dual screen", "dual_screen_enabled", h("label", { class: "toggle small" },
+        h("input", { type: "checkbox", checked: d.dual_screen_enabled === true, onchange: (e) => opt("dual_screen_enabled", e.target.checked ? true : undefined) }),
+        " Use on dual-screen room systems"), d.dual_screen_modes ? "Separate dual screen modes from your file are kept as they are." : "The same layout shows on both screens.")),
+    h("div", { class: "row" },
+      h("label", { class: "toggle" }, h("input", {
+        type: "checkbox", checked: inCycle, disabled: ed.unsaved || clash,
+        onchange: (e) => {
+          const list = Array.isArray(allowed) ? allowed.filter((l) => l !== d.name) : [...catalog.DEFAULT_CONFIG.dtmf_allowed_layouts];
+          if (e.target.checked) list.push(d.name);
+          state.edits.replace(["dtmf_allowed_layouts"], list);
+          changed({ rerender: true });
+        },
+      }), " Callers can switch to it with the keypad"),
+    ),
+    ed.file && !clash ? layoutMeeting(d) : null,
+  );
+}
+
+/** Inline meeting preview of the layout being edited, with a people slider. */
+function layoutMeeting(d) {
+  const sc = state.meeting;
+  sc.layout = d.savedName ?? d.name;
+  const max = Math.max(1, ...d.modes.map((mm) => mm?.constraints?.max_slots ?? 1));
+  // Follow the layout's maximum until the user picks a number with the slider.
+  if (state.layoutEdit.people === undefined || state.layoutEdit.peopleAuto) Object.assign(state.layoutEdit, { people: max, peopleAuto: true });
+  sc.participants = Math.min(state.layoutEdit.people, rules.CUSTOM_LAYOUT_MAX_SLOTS);
+  const count = h("output", { class: "m-count" }, String(sc.participants));
+  return h("div", { class: "layout-meeting" },
+    h("h4", {}, "How it looks in a meeting"),
+    h("div", { class: "m-controls" }, h("label", {}, "People ",
+      h("input", {
+        type: "range", min: 1, max: Math.max(max, 2), value: sc.participants,
+        oninput: (e) => { state.layoutEdit.peopleAuto = false; state.layoutEdit.people = sc.participants = Number(e.target.value); count.textContent = e.target.value; previewUpdaters.forEach((fn) => fn()); },
+      }), count),
+    h("span", { class: "muted small" }, "Uses your theme's watermark, indicators and banner. Change the scenario on the Review step.")),
+    meetingPreview(0.33));
+}
+
+SETTINGS_PANES.layouts = () => {
+  const customs = customLayouts(build().theme);
+  const taken = new Set(Object.keys(customs));
+  const templateId = nextId();
+  const create = (layout) => {
+    layout.name = uniqueLayoutName(layout.name, taken);
+    openLayout(layout, null);
+    state.layoutEdit.sel = null;
+    layoutChanged();
+  };
+  return h("div", {},
+    section("Custom layouts", null,
+      h("p", { class: "muted" }, "Design your own video layouts: where each person appears, who's the main speaker, and what happens while someone presents. Use a layout by choosing its name on a meeting room, in the API, or from the keypad layout cycle."),
+      h("p", { class: "notice-inline" }, "Custom layouts need a ", h("strong", {}, "customlayouts"), " licence on your Infinity system."),
+      Object.keys(customs).length
+        ? h("div", { class: "layout-list" }, Object.values(customs).sort((a, b) => a.name.localeCompare(b.name)).map((l) => h("div", { class: `layout-row ${state.layoutEdit?.file === l.$file ? "active" : ""}` },
+          h("code", { class: "key" }, l.name),
+          h("span", { class: "muted small" }, `${Array.isArray(l.modes) ? l.modes.length : 0} mode(s) · up to ${Math.max(0, ...(Array.isArray(l.modes) ? l.modes : []).map((mm) => mm?.constraints?.max_slots ?? 0))} people${Array.isArray(l.pres_modes) ? " · presentation layout" : ""}`),
+          h("span", { class: "spacer" }),
+          h("button", { type: "button", class: "btn small-btn", onclick: () => { openLayout(l, l.$file); renderMain(); } }, "Edit"),
+          h("button", { type: "button", class: "btn subtle small-btn", onclick: () => { const { $file, ...copy } = clone(l); copy.name = `${l.name.slice(0, 45)}_copy`; create(copy); } }, "Duplicate"),
+          h("button", {
+            type: "button", class: "btn subtle small-btn",
+            onclick: () => {
+              if (!confirm(`Delete the layout ${l.name}?`)) return;
+              removeFile(l.$file);
+              updateAllowedLayouts(l.name, null);
+              if (state.layoutEdit?.file === l.$file) state.layoutEdit = null;
+              changed({ rerender: true });
+            },
+          }, "Delete"))))
+        : h("p", { class: "muted small" }, "No custom layouts in your theme yet."),
+      h("div", { class: "row" },
+        h("label", { for: templateId }, "Start from "),
+        h("select", { id: templateId }, Object.entries(TEMPLATES).map(([k, t]) => h("option", { value: k }, t.title))),
+        h("button", { type: "button", class: "btn primary", onclick: () => create(TEMPLATES[document.getElementById(templateId).value].layout()) }, "New layout")),
+      h("p", { class: "muted small" }, "Pexip's ", docsLink("layout designer", catalog.DOCS.layoutDesigner), " can also edit these files, including separate dual screen layouts.")),
+    state.layoutEdit ? layoutEditor() : null,
   );
 };
 
@@ -1578,6 +2102,7 @@ RENDERERS.images = () => {
   return h("div", {},
     h("h1", {}, "Images"),
     h("p", { class: "lead" }, "Upload your logos and backgrounds. Images in the wrong size or format are converted automatically (backgrounds are cropped to fill 1920×1080, logos are fitted inside 200×100)."),
+    meetingDock(),
     h("div", { class: "slot-grid" }, catalog.IMAGE_SLOTS.map(imageSlotCard)),
     notchSection(),
     section("Other theme files", "Splash screen icons (icon_*.svg), extra backgrounds (background_*.jpg), custom layouts (custom_layout_*.json) and other files in the theme.",
@@ -1791,6 +2316,8 @@ RENDERERS.review = () => {
         report.errors.length ? h("label", { class: "toggle" },
           h("input", { type: "checkbox", checked: state.allowErrors, onchange: (e) => { state.allowErrors = e.target.checked; renderMain(); } }),
           " Download anyway (Infinity may reject it)") : null)),
+    section("Meeting preview", "How your theme looks in a meeting. Change the scenario to see each indicator, the banner and the layouts. Positions follow Pexip's documentation; the real thing may differ slightly.",
+      h("div", { class: "meeting-full" }, meetingPreview(0.42), meetingControls())),
     sortedIssues.length ? section("Checks", "Errors mean Infinity will probably reject the theme or the setting won't work. Warnings are allowed but worth checking.", issueList(sortedIssues)) : null,
     section(both ? "Upload the Infinity theme" : "Upload it to Infinity",
       both ? "The theme covers what Infinity itself shows and plays: splash screens, watermarks, indicators, banners and voice prompts, on room systems, phones and the web app." : null,
