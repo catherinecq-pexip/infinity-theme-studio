@@ -65,3 +65,11 @@ test("indicator icons are described and linked to indicator cards", () => {
     for (const item of ind.notch) assert.ok(rules.NOTCH_ICONS.includes(item), `${ind.id}: ${item}`);
   }
 });
+
+test("Infinity's default settings use only known settings and valid values", async () => {
+  const { validate } = await import("../site/js/validate.js");
+  for (const key of Object.keys(catalog.DEFAULT_CONFIG)) assert.ok(rules.KNOWN_TOP_LEVEL.has(key), key);
+  const r = validate({ name: "d", files: { "themeconfig.json": new TextEncoder().encode(JSON.stringify({ theme_version: 2, ...catalog.DEFAULT_CONFIG })) } });
+  assert.equal(r.issues.length, 0, r.issues.map((i) => i.message).join("\n"));
+  assert.equal(catalog.DEFAULT_CONFIG.dtmf_conference_control_commands["*6"], "toggle_self_mute");
+});

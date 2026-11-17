@@ -215,8 +215,8 @@ function validateConfig(config, theme, customLayouts, report) {
   if (has(config, "splash_screens")) validateSplashScreens(config.splash_screens, theme, report);
 }
 
-function checkColor(value, where, report) {
-  if (typeof value !== "string" || !rules.COLOR_RE.test(value)) {
+function checkColor(value, where, report, { allowNumber = false } = {}) {
+  if (allowNumber ? !rules.isColour(value) : (typeof value !== "string" || !rules.COLOR_RE.test(value))) {
     report.error(F, `${where} must be a colour like 0xRRGGBB or 0xAARRGGBB (got ${repr(value)}).`);
   }
 }
@@ -390,7 +390,7 @@ function validateSplashScreens(ss, theme, report) {
     }
     const lt = spec.layout_type;
     if (lt !== undefined && lt !== null && !rules.LAYOUT_TYPES.has(lt)) {
-      report.error(F, `${where}.layout_type must be 'vertical' or 'free_form'.`);
+      report.error(F, `${where}.layout_type must be one of ${sorted(rules.LAYOUT_TYPES)}.`);
     }
     if (spec.background !== undefined && spec.background !== null) {
       validateBackgroundRef(spec.background, where, theme, report);
@@ -408,7 +408,7 @@ function validateBackgroundRef(bg, where, theme, report) {
     report.error(F, `${where}.background must be {"path": "background_x.jpg"} or {"color": "0xRRGGBB"}.`);
     return;
   }
-  if (has(bg, "color")) checkColor(bg.color, `${where}.background.color`, report);
+  if (has(bg, "color")) checkColor(bg.color, `${where}.background.color`, report, { allowNumber: true });
   if (has(bg, "path")) {
     const path = bg.path;
     if (typeof path !== "string" || !rules.BACKGROUND_PATH_RE.test(path)) {
@@ -451,9 +451,9 @@ function validateElement(el, where, theme, labels, report) {
     else if (!labels.has(label)) {
       report.warn(F, `${where}.label '${label}' is not a default label and is not defined in splash_screens.labels.`);
     }
-    if (has(el, "font") && !rules.FONTS.has(el.font)) report.error(F, `${where}.font must be one of ${sorted(rules.FONTS)}.`);
+    if (has(el, "font") && !rules.knownFont(el.font)) report.error(F, `${where}.font must be one of ${sorted(rules.FONTS)}.`);
     if (has(el, "align") && !rules.TEXT_ALIGN.has(el.align)) report.error(F, `${where}.align must be center, left or right.`);
-    if (has(el, "color")) checkColor(el.color, `${where}.color`, report);
+    if (has(el, "color")) checkColor(el.color, `${where}.color`, report, { allowNumber: true });
   }
 }
 
@@ -518,6 +518,10 @@ function validateJpg(fname, data, report) {
   if (!img) return;
   if (img.mode !== "RGB") {
     report.error(fname, `JPG must be RGB mode (got ${img.mode}; CMYK/greyscale is not supported).`);
+  }
+  if (fname === rules.PRESENCE_AVATAR_FILE) {
+    const [aw, ah] = rules.PRESENCE_AVATAR_SIZE;
+    if (img.width !== aw || img.height !== ah) report.warn(fname, `Presence avatar should be ${aw}x${ah} (got ${img.width}x${img.height}).`);
   }
   if (fname.startsWith("background")) {
     const [bw, bh] = rules.BACKGROUND_SIZE;

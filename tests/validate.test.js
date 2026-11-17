@@ -154,3 +154,19 @@ test("custom layouts count as known for dtmf_allowed_layouts", () => {
   assert.ok(r.ok, messages(r));
   assert.ok(!messages(r).includes("dtmf_allowed_layouts"), messages(r));
 });
+
+test("presence avatar and PowerPoint Live placeholder", () => {
+  assert.ok(v({ "themeconfig.json": cfg(), "presence_avatar_image.jpg": jpgBytes(128, 128) }).issues.length === 0);
+  const r = v({ "themeconfig.json": cfg(), "presence_avatar_image.jpg": jpgBytes(300, 300), "no_powerpoint_live.jpg": jpgBytes(1280, 720) });
+  assert.ok(r.ok, messages(r));
+  assert.match(messages(r), /Presence avatar should be 128x128/);
+  assert.equal(r.warnings.length, 1, messages(r));
+  assert.equal(v({ "themeconfig.json": cfg(), "presence_avatar_image.jpg": jpgBytes(128, 128, 4) }).ok, false, "CMYK rejected");
+});
+
+test("fonts given as CSS-style lists (as in Pexip's defaults)", () => {
+  const screen = (font) => ({ splash_screens: { screens: { welcome: { elements: [{ type: "text", label: "welcome", font }] } } } });
+  assert.ok(v({ "themeconfig.json": cfg(screen("inter medium,noto-sans,sans")) }).ok);
+  assert.ok(v({ "themeconfig.json": cfg(screen("Roboto Condensed")) }).ok);
+  assert.equal(v({ "themeconfig.json": cfg(screen("Comic Sans, sans")) }).ok, false);
+});

@@ -232,6 +232,12 @@ export const IMAGE_SLOTS = [
     help: "Fills a layout slot reserved for someone who hasn't joined.", fit: { w: 1920, h: 1080, mode: "cover", type: "image/jpeg" } },
   { file: "background_avatar_in_mix.jpg", title: "Avatar background", spec: "JPG (RGB), 1920×1080 recommended",
     help: "Behind participant avatars when avatars are switched on.", fit: { w: 1920, h: 1080, mode: "cover", type: "image/jpeg" } },
+  { file: "presence_avatar_image.jpg", title: "Presence avatar", spec: "JPG (RGB), 128×128",
+    help: "Shown next to the meeting alias in legacy Pexip apps, and as the contact avatar in Skype for Business. The corners are cropped to a circle.",
+    fit: { w: 128, h: 128, mode: "cover", type: "image/jpeg" } },
+  { file: "no_powerpoint_live.jpg", title: "PowerPoint Live placeholder (Teams)", spec: "JPG (RGB)",
+    help: "Only for calls into Microsoft Teams meetings: shown when a Teams user shares PowerPoint Live, Excel, Whiteboard or other content Infinity can't show.",
+    fit: { mode: "contain", type: "image/jpeg" } },
 ];
 
 // ---------------------------------------------------------------------------
@@ -422,4 +428,89 @@ export const NOTCH_ICON_INFO = {
   ai: { title: "AI", help: "Shown while AI services are active." },
   smart_notes: { title: "Smart notes", help: "Shown while notes are being taken." },
   external_media_proc: { title: "External media processing", help: "Shown while media is sent to an external application." },
+};
+
+/** Splash screens: friendly names and gallery groups (every rules.SPLASH_SCREENS entry once). */
+export const SCREEN_NAMES = {
+  welcome: "Welcome", connecting: "Connecting", pin_welcome: "PIN welcome", pin_entry: "Entering the PIN",
+  pin_correct: "PIN accepted", pin_invalid: "Wrong PIN", timeout: "Timed out",
+  waiting_for_host: "Waiting for the host", inlobby: "In the lobby", inlobby_status_unknown: "Lobby status unknown",
+  other_participants_audio_only: "Everyone else is audio-only", no_presentation: "No presentation",
+  no_main_video: "No main video", no_incoming_video: "No incoming video",
+  stream_waiting: "Stream waiting", streaming_in_progress: "Streaming in progress",
+  virtual_reception_welcome: "Reception welcome", virtual_reception_conference_id_entry: "Entering the meeting number",
+  virtual_reception_conference_id_invalid: "Invalid meeting number", virtual_reception_connecting: "Connecting to the meeting",
+  test_call_welcome: "Test call welcome", test_call_in_progress: "Test call in progress", test_call_complete: "Test call complete",
+  direct_media_welcome: "Welcome", direct_media_waiting_for_host: "Waiting for the host",
+  direct_media_other_participants_audio_only: "Other person is audio-only", direct_media_escalate: "Moving to a bigger meeting",
+  direct_media_deescalate: "Moving back to a direct call", direct_media_host_left: "Host has left",
+  error_capacity_exceeded: "Capacity exceeded", error_insufficient_licenses: "Not enough licenses",
+  error_insufficient_video_licenses: "Not enough video licenses", error_invalid_license: "Invalid license",
+  reserved_slot: "Reserved layout slot", unused_screen: "Unused screen",
+};
+
+export const SCREEN_GROUPS = [
+  { title: "Joining", screens: ["welcome", "connecting", "pin_welcome", "pin_entry", "pin_correct", "pin_invalid", "timeout"] },
+  { title: "Waiting", screens: ["waiting_for_host", "inlobby", "inlobby_status_unknown", "other_participants_audio_only", "no_presentation", "no_main_video", "no_incoming_video"] },
+  { title: "Streaming", screens: ["stream_waiting", "streaming_in_progress"] },
+  { title: "Virtual Reception", screens: ["virtual_reception_welcome", "virtual_reception_conference_id_entry", "virtual_reception_conference_id_invalid", "virtual_reception_connecting"] },
+  { title: "Test call", screens: ["test_call_welcome", "test_call_in_progress", "test_call_complete"] },
+  { title: "Direct media (one-to-one calls)", screens: ["direct_media_welcome", "direct_media_waiting_for_host", "direct_media_other_participants_audio_only", "direct_media_escalate", "direct_media_deescalate", "direct_media_host_left"] },
+  { title: "Errors & licensing", screens: ["error_capacity_exceeded", "error_insufficient_licenses", "error_insufficient_video_licenses", "error_invalid_license"] },
+  { title: "Layout slots", screens: ["reserved_slot", "unused_screen"] },
+];
+
+/**
+ * Infinity's default settings: the Base theme's themeconfig.json as shown in Pexip's
+ * theme documentation (v42). Used for hints, placeholders and prefilled values.
+ */
+export const DEFAULT_CONFIG = {
+  enable_dtmf_conference_control: true,
+  dtmf_conference_control_commands: {
+    "*6": "toggle_self_mute",
+    "*7": "toggle_lock",
+    "*5": "toggle_guest_mute",
+    "*4": "toggle_pres_in_mix",
+    "*9": "toggle_multiscreen",
+    "*8": "cycle_layout",
+    "*3": "toggle_raise_hand",
+    "*1": "cycle_personal_layout",
+    "##": "end_conference"
+  },
+  dtmf_allowed_layouts: [
+    "1:7",
+    "ac",
+    "1:21",
+    "2:21",
+    "2x2",
+    "3x3",
+    "4x4",
+    "5x5",
+    "1:0",
+    "1:33"
+  ],
+  enable_avatars_in_mix: false,
+  disable_ai_indicator: false,
+  disable_external_media_proc_indicator: false,
+  disable_streaming_indicator: false,
+  disable_recording_indicator: false,
+  disable_transcribing_indicator: false,
+  disable_smart_notes_indicator: false,
+  disable_watermark_icon: false,
+  disable_watermark_mute_icon: true,
+  disable_conference_locked_indicator: false,
+  ai_indicator_text: "AI",
+  external_media_proc_indicator_text: "External media processing",
+  streaming_indicator_text: "Streaming enabled",
+  public_streaming_indicator_text: "Public streaming enabled",
+  recording_indicator_text: "Recording",
+  transcribing_indicator_text: "Transcribing",
+  smart_notes_indicator_text: "Smart notes enabled",
+  live_captions_on_indicator_text: "Live captions on",
+  live_captions_off_indicator_text: "Live captions off",
+  conference_locked_indicator_text: "Conference locked",
+  conference_unlocked_indicator_text: "Conference unlocked",
+  conference_locked_indicator_n_waiting_text: "{number_of_waiting_participants} waiting for host",
+  test_call_service_media_delay: 2,
+  test_call_service_disconnect_timeout: 10
 };

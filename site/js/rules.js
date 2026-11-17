@@ -178,13 +178,32 @@ export const DEFAULT_LABELS = new Set([
   "host_left", "direct_media_escalate", "direct_media_deescalate",
 ]);
 
-export const LAYOUT_TYPES = new Set(["vertical", "free_form"]);
+// "direct_media" is used by Pexip's own screen defaults for the direct_media_* screens.
+export const LAYOUT_TYPES = new Set(["vertical", "free_form", "direct_media"]);
 export const ELEMENT_TYPES = new Set(["icon", "text", "pin_digits"]);
 export const TEXT_ALIGN = new Set(["center", "left", "right"]);
 export const FONTS = new Set([
   "Noto Sans", "Roboto", "Roboto Condensed", "GT Pressura", "GT Pressura Light",
   "Inter", "Inter Medium",
 ]);
+/**
+ * Is a text element's font acceptable? Pexip's own defaults use CSS-style lists
+ * such as "inter medium,noto-sans,sans", so the first family is matched against
+ * FONTS ignoring case and hyphens.
+ */
+export function knownFont(font) {
+  if (typeof font !== "string") return false;
+  const norm = (s) => s.trim().toLowerCase().replace(/[-_]+/g, " ").replace(/^["']|["']$/g, "");
+  const first = norm(font.split(",")[0]);
+  return [...FONTS].some((f) => norm(f) === first);
+}
+
+/** 0xRRGGBB / 0xAARRGGBB strings, or an ARGB integer as used in Pexip's screen defaults. */
+export function isColour(value) {
+  if (typeof value === "string") return COLOR_RE.test(value);
+  return Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
+}
+
 export const ICON_PATH_RE = /^icon_[A-Za-z0-9_]+\.svg$/;
 export const BACKGROUND_PATH_RE = /^background[A-Za-z0-9_]*\.jpg$/;
 
@@ -196,6 +215,11 @@ export const BACKGROUND_SIZE = [1920, 1080];
 export const WATERMARK_SIZE = [200, 100];
 export const WATERMARK_FILES = new Set(["watermark_icon.png", "watermark_footer_icon.png"]);
 export const MUTE_WATERMARK_FILE = "watermark_mute_icon.png";
+/** Avatar for legacy Pexip apps / Skype for Business contact (corners cropped round). */
+export const PRESENCE_AVATAR_FILE = "presence_avatar_image.jpg";
+export const PRESENCE_AVATAR_SIZE = [128, 128];
+/** Shown in Microsoft Teams interop calls when PowerPoint Live or other unsupported content is shared. */
+export const NO_POWERPOINT_LIVE_FILE = "no_powerpoint_live.jpg";
 
 /** Base theme SVG files (may be replaced by a file of the same name). */
 export const BASE_SVG_FILES = new Set([

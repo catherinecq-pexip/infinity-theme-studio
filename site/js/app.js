@@ -13,6 +13,7 @@ import { AUDIO_SOURCE_EXTENSIONS, toInfinityWav, wavDuration } from "./audio.js"
 import { fitImage, objectUrl } from "./imaging.js";
 import { sniffFormat, jpegInfo, pngInfo } from "./formats.js";
 import { checkNotchSvg, makeDarkVariant, notchFile } from "./icons.js";
+import { effectiveScreens, layoutScreen, screenBackground, screenIcons, screenLabels, SCREEN_H, SCREEN_W } from "./splash.js";
 
 // ---------------------------------------------------------------------------
 // State
@@ -46,6 +47,9 @@ const state = {
   allowErrors: false,
   dirty: false,
   recording: null,        // { file, recorder, stream }
+  screenDefaults: null,   // Pexip's splash screen defaults (defaults/theme_screen_defaults_v41.json)
+  splashScreen: "welcome",// screen open in the Splash screens editor
+  splashGuide: false,     // show the 4:3 crop guide
   version: loadVersion(), // Infinity version the theme is for
 };
 
@@ -187,9 +191,29 @@ function triSelect(id, value, labels, onChange) {
   return sel;
 }
 
+/** "Infinity default" label, with the actual default when known, e.g. "Infinity default (No)". */
+function defaultLabel(value, yes = "Yes", no = "No") {
+  return value === true ? `Infinity default (${yes})` : value === false ? `Infinity default (${no})` : "Infinity default";
+}
+
+/** Add an "Edit default" button that copies Infinity's default text into an empty input/textarea. */
+function addEditDefault(el, def) {
+  const input = el.querySelector("textarea, input[type=text]");
+  if (!input || !def || input.disabled) return el;
+  const btn = h("button", {
+    type: "button", class: "btn subtle small-btn", title: "Copy Infinity's default text into the box to edit it",
+    onclick: () => { input.value = def; input.dispatchEvent(new Event("input")); input.focus(); },
+  }, "Edit default");
+  const sync = () => { btn.hidden = input.value !== ""; };
+  input.addEventListener("input", sync);
+  sync();
+  el.append(btn);
+  return el;
+}
+
 function boolField({ key, label, help }) {
   const id = nextId();
-  const sel = triSelect(id, current()[key], ["Infinity default", "Yes", "No"], (v) => {
+  const sel = triSelect(id, current()[key], [defaultLabel(catalog.DEFAULT_CONFIG[key]), "Yes", "No"], (v) => {
     if (v === "") state.edits.remove([key]);
     else state.edits.set([key], v === "true");
     changed();
@@ -228,7 +252,8 @@ function numberField({ key, label, help }) {
   const id = nextId();
   const value = current()[key];
   const input = h("input", {
-    id, type: "number", min: 0, step: "any", placeholder: "Infinity default",
+    id, type: "number", min: 0, step: "any",
+    placeholder: catalog.DEFAULT_CONFIG[key] !== undefined ? `Infinity default (${catalog.DEFAULT_CONFIG[key]})` : "Infinity default",
     value: typeof value === "number" ? String(value) : "",
     oninput: (e) => {
       const v = e.target.value;
@@ -675,7 +700,7 @@ const SETTINGS_TABS = [
   ["classification", "Classification banner"],
   ["clock", "Clock & timer"],
   ["keypad", "Keypad"],
-  ["wording", "Splash screen wording"],
+  ["wording", "Splash screens"],
   ["advanced", "Advanced"],
 ];
 
@@ -706,7 +731,8 @@ SETTINGS_PANES.general = () => h("div", {},
       if (f.type === "bool") return boolField(f);
       if (f.type === "number") return numberField(f);
       if (f.type === "color") return colorField([f.key], f.label, { help: f.help });
-      return textField([f.key], f.label, { help: f.help });
+      const def = catalog.DEFAULT_CONFIG[f.key];
+      return addEditDefault(textField([f.key], f.label, { help: f.help, placeholder: def ?? "Infinity default" }), def);
     })), hiddenNote(s.fields.filter((f) => !ok("setting", f.key)).map((f) => [f.label, rules.minVersion("setting", f.key)])));
   }),
   section("Message box", "Colours of the message box shown over the video (for example, in-meeting notices).",
@@ -758,7 +784,8 @@ function indicatorCard(ind) {
   const visibility = canHide ? (() => {
     const id = nextId();
     const cur = current()[ind.hide];
-    const sel = triSelect(id, cur === true ? false : cur === false ? true : undefined, ["Infinity default", "Show", "Hide"], (v) => {
+    const def = catalog.DEFAULT_CONFIG[ind.hide];
+    const sel = triSelect(id, cur === true ? false : cur === false ? true : undefined, [defaultLabel(def === undefined ? undefined : !def, "Shown", "Hidden"), "Show", "Hide"], (v) => {
       if (v === "") state.edits.remove([ind.hide]);
       else state.edits.set([ind.hide], v === "false");
       changed();
@@ -775,7 +802,9 @@ function indicatorCard(ind) {
     h("div", { class: "fields" },
       visibility,
       texts.map((t) => {
-        const el = textField([t.key], t.label, { max: t.max, help: t.help });
+        const def = catalog.DEFAULT_CONFIG[t.key];
+        const el = textField([t.key], t.label, { max: t.max, help: t.help, placeholder: def ?? "Infinity default" });
+        if (!iconOnly) addEditDefault(el, def);
         if (iconOnly) el.querySelectorAll("input, textarea").forEach((i) => { i.disabled = true; i.value = ""; i.placeholder = "Hidden (icon only)"; });
         return el;
       })),
@@ -1093,7 +1122,8 @@ SETTINGS_PANES.keypad = () => {
 
   const table = custom ? h("div", { class: "dtmf-table" }, Object.entries(catalog.DTMF_COMMAND_LABELS).filter(([cmd]) => ok("dtmf", cmd)).map(([cmd, label]) => {
     const id = nextId();
-    inputs[cmd] = h("input", { id, type: "text", maxlength: 2, class: "dtmf-input", value: byCommand[cmd] ?? "", placeholder: "—", oninput: saveCommands, spellcheck: "false" });
+    const defCode = Object.entries(catalog.DEFAULT_CONFIG.dtmf_conference_control_commands).find(([, c]) => c === cmd)?.[0];
+    inputs[cmd] = h("input", { id, type: "text", maxlength: 2, class: "dtmf-input", value: byCommand[cmd] ?? "", placeholder: defCode ?? "—", title: defCode ? `Infinity default: ${defCode}` : "No default code", oninput: saveCommands, spellcheck: "false" });
     errors[cmd] = h("span", { class: "error-text" });
     return h("div", { class: "dtmf-row" },
       h("label", { for: id }, label, h("code", { class: "key" }, cmd)),
@@ -1112,19 +1142,20 @@ SETTINGS_PANES.keypad = () => {
         h("input", {
           type: "checkbox", checked: Boolean(custom),
           onchange: (e) => {
-            if (e.target.checked) state.edits.replace(["dtmf_conference_control_commands"], cmds ?? { "*6": "toggle_self_mute" });
+            const defaults = Object.fromEntries(Object.entries(catalog.DEFAULT_CONFIG.dtmf_conference_control_commands).filter(([, c]) => ok("dtmf", c)));
+            if (e.target.checked) state.edits.replace(["dtmf_conference_control_commands"], cmds ?? defaults);
             else state.edits.remove(["dtmf_conference_control_commands"]);
             changed({ rerender: true });
           },
         }), " Choose my own keypad codes"),
-      custom ? h("p", { class: "muted small" }, "Two characters per command (0-9, * and #). Leave a command blank to leave it out of your list. Your branding ZIP or Infinity's Base theme shows the current defaults. If you move mute away from *6 and your muted overlay image mentions the code, update the image too.") : null,
+      custom ? h("p", { class: "muted small" }, "Two characters per command (0-9, * and #). Infinity's default codes are filled in to start with, and shown in grey when a box is empty. Leave a command blank to leave it out of your list. If you move mute away from *6 and your muted overlay image mentions the code, update the image too.") : null,
       table),
     section("Layouts available from the keypad", "Limit which layouts callers can cycle through with the change-layout codes.",
       h("label", { class: "toggle" },
         h("input", {
           type: "checkbox", checked: limit,
           onchange: (e) => {
-            if (e.target.checked) state.edits.replace(["dtmf_allowed_layouts"], Object.keys(catalog.LAYOUT_LABELS));
+            if (e.target.checked) state.edits.replace(["dtmf_allowed_layouts"], [...catalog.DEFAULT_CONFIG.dtmf_allowed_layouts]);
             else state.edits.remove(["dtmf_allowed_layouts"]);
             changed({ rerender: true });
           },
@@ -1156,26 +1187,137 @@ function labelField(key, label) {
     help: /\{\w+\}/.test(def ?? "") ? "Text in {braces} is filled in by Infinity (the meeting number or name). Keep it if you want it shown." : null,
   });
   if (!def) return el;
-  const ta = el.querySelector("textarea");
-  ta.rows = Math.max(2, def.split("\n").length);
-  const btn = h("button", {
-    type: "button", class: "btn subtle small-btn", title: "Copy Infinity's default wording into the box to edit it",
-    onclick: () => { ta.value = def; ta.dispatchEvent(new Event("input")); ta.focus(); },
-  }, "Edit default");
-  const sync = () => { btn.hidden = ta.value !== ""; };
-  ta.addEventListener("input", sync);
-  sync();
-  el.append(btn);
-  return el;
+  el.querySelector("textarea").rows = Math.max(2, def.split("\n").length);
+  return addEditDefault(el, def);
+}
+
+// Splash screens: previews + wording + icons
+
+const LABEL_NAMES = Object.fromEntries(catalog.LABEL_GROUPS.flatMap((g) => Object.entries(g.labels)));
+const PREVIEW_FONTS = "Inter, 'Noto Sans', Roboto, 'Segoe UI', system-ui, sans-serif";
+const fileUrls = new WeakMap();
+
+/** URL for a theme file (images, SVGs): the theme's copy if it has one, otherwise Pexip's bundled default. */
+function themeFileUrl(file, defaultsDir = "defaults/base") {
+  const bytes = build().theme.files[file];
+  if (!bytes) return `${defaultsDir}/${file}`;
+  if (!fileUrls.has(bytes)) fileUrls.set(bytes, objectUrl(bytes, file));
+  return fileUrls.get(bytes);
+}
+
+const missingUrls = new Set(); // defaults that failed to load, so redraws don't refetch them
+
+/** <img> that turns into a labelled outline if the file isn't available. */
+function previewImg(file, style = {}, { quiet = false } = {}) {
+  const src = themeFileUrl(file);
+  const placeholder = () => {
+    if (quiet) return h("span", { hidden: true });
+    const ph = h("span", { class: "img-missing", title: `${file}: default image not available` }, file.replace(/^icon_|\.(svg|jpg|png)$/g, ""));
+    Object.assign(ph.style, style);
+    return ph;
+  };
+  if (missingUrls.has(src)) return placeholder();
+  return h("img", {
+    src, alt: "", draggable: "false", style,
+    onerror: (e) => { missingUrls.add(src); e.currentTarget.replaceWith(placeholder()); },
+  });
+}
+
+/** A 1920x1080 mock-up of one splash screen, scaled to fit. */
+function screenPreview(name, scale, { guide = false } = {}) {
+  const outer = h("div", { class: "screen-frame", style: { width: `${SCREEN_W * scale}px`, height: `${SCREEN_H * scale}px` } });
+  const draw = () => {
+    if (!state.screenDefaults) { outer.replaceChildren(h("span", { class: "img-missing" }, "Preview unavailable")); return; }
+    const { screens, labels } = effectiveScreens(current(), state.screenDefaults);
+    const spec = screens[name] ?? {};
+    const bg = screenBackground(spec);
+    const stage = h("div", { class: "screen", style: { transform: `scale(${scale})`, background: bg.color ?? "linear-gradient(135deg, #3a4a6b, #1d2538)" } });
+    if (bg.path) stage.append(previewImg(bg.path, { position: "absolute", inset: "0", width: "100%", height: "100%", objectFit: "cover" }, { quiet: true }));
+    for (const box of layoutScreen(spec, labels)) {
+      const pos = { position: "absolute", left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px` };
+      if (box.kind === "icon") {
+        stage.append(h("div", { class: "screen-box", style: pos }, previewImg(box.path, { width: "100%", height: "100%", objectFit: "contain" })));
+      } else if (box.kind === "digits") {
+        stage.append(h("div", { class: "screen-box digits", style: { ...pos, gap: `${box.spacing}px` } },
+          Array.from({ length: box.count }, () => previewImg(box.path, { width: `${box.digitW}px`, height: `${box.digitH}px` }))));
+      } else {
+        const st = box.style;
+        stage.append(h("div", {
+          class: "screen-text",
+          style: { ...pos, fontSize: `${st.fontSize}px`, lineHeight: `${st.lineHeight}px`, letterSpacing: `${st.letterSpacing}px`, textAlign: st.align, color: st.color, fontFamily: PREVIEW_FONTS, fontWeight: /medium|bold/i.test(st.font) ? 500 : 400 },
+        }, box.text));
+      }
+    }
+    if (guide) stage.append(h("div", { class: "guide-43", title: "4:3 crop: what shows on 4:3 screens" }));
+    outer.replaceChildren(stage);
+  };
+  previewUpdaters.push(draw);
+  draw();
+  return outer;
+}
+
+async function replaceSplashIcon(file) {
+  const [picked] = await pickFiles({ accept: ".svg,image/svg+xml" });
+  if (!picked) return;
+  const text = await picked.text();
+  const problems = checkNotchSvg(text);
+  const errors = problems.filter((p) => p.level === "error");
+  if (errors.length) { toast(`${picked.name}: ${errors[0].message}`, "error"); return; }
+  setFile(file, utf8.encode(text));
+  toast(`Replaced ${file}`, "success");
+  changed({ rerender: true });
+}
+
+function splashEditor(name) {
+  const { screens } = effectiveScreens(current(), state.screenDefaults);
+  const spec = screens[name] ?? {};
+  const labels = [...new Set(screenLabels(spec))];
+  const icons = screenIcons(spec);
+  const bg = screenBackground(spec);
+  const custom = Boolean(current().splash_screens?.screens?.[name]);
+  return h("section", { class: "card splash-editor" },
+    h("div", { class: "slot-head" },
+      h("h3", {}, catalog.SCREEN_NAMES[name] ?? name, " ", h("code", { class: "key" }, name)),
+      h("label", { class: "toggle small" },
+        h("input", { type: "checkbox", checked: state.splashGuide, onchange: (e) => { state.splashGuide = e.target.checked; renderMain(); } }),
+        " Show 4:3 crop guide")),
+    custom ? h("p", { class: "muted small" }, "This screen's layout comes from your theme.") : null,
+    h("div", { class: "splash-editor-body" },
+      screenPreview(name, 0.34, { guide: state.splashGuide }),
+      h("div", { class: "splash-editor-side" },
+        labels.length ? h("div", {}, h("h4", {}, "Text on this screen"),
+          labels.map((key) => labelField(key, LABEL_NAMES[key] ?? key))) : h("p", { class: "muted small" }, "No text on this screen."),
+        icons.length ? h("div", {}, h("h4", {}, "Icons"),
+          icons.map((file) => h("div", { class: "icon-row" },
+            h("span", { class: "icon-thumb" }, previewImg(file, { maxWidth: "100%", maxHeight: "100%" })),
+            h("code", { class: "key" }, file),
+            h("span", { class: "muted small" }, file in state.files ? "Custom" : file in build().theme.files ? "From theme ZIP" : "Default"),
+            h("button", { type: "button", class: "btn small-btn", onclick: () => replaceSplashIcon(file) }, "Replace…"),
+            file in state.files ? h("button", { type: "button", class: "btn subtle small-btn", onclick: () => { removeFile(file); changed({ rerender: true }); } }, "Use default") : null))) : null,
+        h("div", {}, h("h4", {}, "Background"),
+          bg.path
+            ? h("p", { class: "small" }, h("code", {}, bg.path), ` · ${bg.path in build().theme.files ? "from your theme" : "Infinity default"} · `,
+              h("button", { type: "button", class: "btn subtle small-btn", onclick: () => go("images") }, "Change in Images"))
+            : h("p", { class: "small" }, "Solid colour: ", h("span", { class: "dot", style: { background: bg.color } }))))),
+    h("p", { class: "muted small" }, "Preview is approximate: fonts and exact spacing may differ slightly on Infinity. {conference_name} and {conference_id} are shown with sample values."),
+  );
 }
 
 SETTINGS_PANES.wording = () => {
   const labels = current().splash_screens?.labels ?? {};
   const customKeys = Object.keys(labels).filter((k) => !rules.DEFAULT_LABELS.has(k));
+  if (!state.screenDefaults) {
+    return section("Splash screens", "Previews are unavailable because the screen defaults couldn't be loaded.",
+      catalog.LABEL_GROUPS.map((g) => h("div", { class: "fields two" }, Object.entries(g.labels).map(([key, label]) => labelField(key, label)))));
+  }
   return h("div", {},
-    h("p", { class: "muted" }, "Change the text on the splash screens people see while joining, waiting, or when something goes wrong. Infinity's default wording is shown in grey; leave a box empty to keep it, or click “Edit default” to change it. Press Enter for a new line."),
-    catalog.LABEL_GROUPS.map((g) => section(g.title, null, h("div", { class: "fields two" },
-      Object.entries(g.labels).map(([key, label]) => labelField(key, label))))),
+    h("p", { class: "muted" }, "These are the screens people see while joining, waiting, or when something goes wrong. Pick a screen to preview it and change its text, icons and background. Previews update as you type."),
+    splashEditor(state.splashScreen),
+    catalog.SCREEN_GROUPS.map((g) => section(g.title, null, h("div", { class: "screen-grid" },
+      g.screens.map((name) => h("button", {
+        type: "button", class: `screen-tile ${state.splashScreen === name ? "active" : ""}`, "aria-pressed": String(state.splashScreen === name),
+        onclick: () => { state.splashScreen = name; renderMain(); window.scrollTo({ top: 0, behavior: "smooth" }); },
+      }, screenPreview(name, 0.13), h("span", { class: "screen-name" }, catalog.SCREEN_NAMES[name] ?? name)))))),
     customKeys.length ? section("Custom labels in your theme", "Extra labels defined by your branding ZIP's splash screen layouts.",
       h("div", { class: "fields two" }, customKeys.map((key) => textField(["splash_screens", "labels", key], key, { multiline: true })))) : null,
   );
@@ -1265,6 +1407,7 @@ function needsFit(bytes, slot) {
     const info = wantPng ? pngInfo(bytes) : jpegInfo(bytes);
     if (!wantPng && info.mode !== "RGB") return true;
     if (slot.file === rules.MUTE_WATERMARK_FILE) return info.width > slot.fit.w || info.height > slot.fit.h;
+    if (!slot.fit.w) return false; // any size accepted
     return info.width !== slot.fit.w || info.height !== slot.fit.h;
   } catch {
     return true;
@@ -1276,7 +1419,7 @@ async function addImageToSlot(slot, file) {
   if (needsFit(bytes, slot)) {
     try {
       bytes = await fitImage(bytes, file.name, slot.fit);
-      toast(`Converted ${file.name} to ${slot.spec.split(",")[0]} ${slot.fit.w}×${slot.fit.h}`, "success");
+      toast(`Converted ${file.name} to ${slot.spec.split(",")[0]}${slot.fit.w ? ` ${slot.fit.w}×${slot.fit.h}` : ""}`, "success");
     } catch (err) {
       toast(`${file.name}: ${err.message}`, "error");
       return;
@@ -1303,7 +1446,7 @@ function imageSlotCard(slot) {
   const fromBase = state.base && slot.file in state.base.files;
   return h("section", { class: "card slot" },
     h("div", { class: `thumb ${slot.fit.type === "image/png" ? "checker" : ""}` },
-      bytes ? thumb(slot.file, bytes) : h("span", { class: "muted small" }, "Not included")),
+      bytes ? thumb(slot.file, bytes) : previewImg(slot.file, { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" })),
     h("div", { class: "slot-body" },
       h("div", { class: "slot-head" }, h("h3", {}, slot.title), h("span", { class: `badge ${status.replace(/\s/g, "-").toLowerCase()}` }, status)),
       h("p", { class: "muted" }, slot.help),
@@ -1690,6 +1833,13 @@ async function init() {
     state.profileData = Object.fromEntries(results);
   } catch (err) {
     toast(`Couldn't load the experience profiles (${err.message}). If you opened index.html directly, run it through a web server instead (see README).`, "error");
+  }
+  try {
+    const res = await fetch("defaults/theme_screen_defaults_v41.json");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state.screenDefaults = JSON.parse((await res.text()).replace(/^\uFEFF/, ""));
+  } catch (err) {
+    toast(`Couldn't load the splash screen defaults (${err.message}); previews are unavailable.`, "error");
   }
   window.addEventListener("beforeunload", (e) => {
     if (state.dirty) { e.preventDefault(); e.returnValue = ""; }

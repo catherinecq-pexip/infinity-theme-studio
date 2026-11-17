@@ -26,8 +26,11 @@ function loadImage(bytes, mime) {
  * mode "cover" crops to fill (backgrounds); "contain" fits inside with transparent padding (logos).
  * type: "image/jpeg" (always RGB, flattened on white) or "image/png".
  */
-export async function fitImage(bytes, sourceName, { w, h, mode, type }) {
+export async function fitImage(bytes, sourceName, { w: fw, h: fh, mode, type }) {
   const img = await loadImage(bytes, mimeFor(sourceName));
+  // No target size given: keep the image's own size (format/colour conversion only).
+  const w = fw ?? img.naturalWidth;
+  const h = fh ?? img.naturalHeight;
   const iw = img.naturalWidth || w;
   const ih = img.naturalHeight || h;
   const scale = mode === "cover" ? Math.max(w / iw, h / ih) : Math.min(w / iw, h / ih);
