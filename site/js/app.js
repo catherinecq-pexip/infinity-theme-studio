@@ -26,6 +26,23 @@ function loadVersion() {
   return rules.SUPPORTED_VERSIONS.includes(v) ? v : rules.LATEST_VERSION;
 }
 
+/** Meeting preview panel: open/closed, width and scenario controls, remembered between visits. */
+function loadDockPrefs() {
+  try {
+    const p = JSON.parse(globalThis.localStorage?.getItem("its.meetingDock") ?? "{}");
+    return {
+      ...(typeof p.dock === "boolean" ? { dock: p.dock } : {}),
+      ...(typeof p.controls === "boolean" ? { controls: p.controls } : {}),
+      ...(Number.isFinite(p.dockW) ? { dockW: p.dockW } : {}),
+    };
+  } catch { return {}; }
+}
+
+function saveDockPrefs() {
+  const { dock, dockW, controls } = state.meeting;
+  try { localStorage.setItem("its.meetingDock", JSON.stringify({ dock, dockW, controls })); } catch { /* private mode */ }
+}
+
 /** Does the chosen Infinity version accept this item? kind: setting | indicator | audio | dtmf */
 const ok = (kind, name) => rules.supports(state.version, kind, name);
 
@@ -53,7 +70,7 @@ const state = {
   splashScreen: "welcome",// screen open in the Splash screens editor
   splashGuide: false,     // show the 4:3 crop guide
   meeting: {              // meeting preview scenario (never written to the theme)
-    dock: true, big: false, controls: false, layout: "1:7", participants: 6, level: null,
+    dock: true, dockW: 480, controls: false, ...loadDockPrefs(), layout: "1:7", participants: 6, level: null,
     recording: true, streaming: false, transcribing: false, captions: false, ai: false,
     locked: false, waiting: 2, hand: true, cameraOff: false, muted: false, light: false,
   },
@@ -727,7 +744,7 @@ RENDERERS.settings = () => {
     tabs,
     box,
     SETTINGS_PANES[state.settingsTab](),
-    ["wording", "layouts", "advanced"].includes(state.settingsTab) ? null : meetingDock(),
+    state.settingsTab === "layouts" ? null : meetingDock(),
   );
 };
 
@@ -1387,9 +1404,25 @@ function meetingIndicators(sc, avatars) {
 
 const initials = (name) => name.slice(0, 2).toUpperCase();
 
-/** A 1920x1080 mock-up of a meeting using the theme, scaled to fit. Redraws on every change. */
+/**
+ * A 1920x1080 mock-up of a meeting using the theme, scaled to fit. Redraws on every change.
+ * scale: a fixed factor, or "fit" to fill the container's width and follow it as it resizes.
+ */
 function meetingPreview(scale) {
-  const outer = h("div", { class: "screen-frame meeting-frame", style: { width: `${MEETING_W * scale}px`, height: `${MEETING_H * scale}px` } });
+  const fit = scale === "fit";
+  const outer = h("div", {
+    class: `screen-frame meeting-frame ${fit ? "fit" : ""}`,
+    style: fit ? {} : { width: `${MEETING_W * scale}px`, height: `${MEETING_H * scale}px` },
+  });
+  if (fit) {
+    scale = 0.25;
+    new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      if (!w) return;
+      scale = w / MEETING_W;
+      if (outer.firstChild) outer.firstChild.style.transform = `scale(${scale})`;
+    }).observe(outer);
+  }
   const draw = () => {
     const cfg = current();
     const sc = state.meeting;
@@ -1500,22 +1533,67 @@ function meetingControls() {
     })));
 }
 
-/** Floating preview shown on the Settings and Images steps. */
+const DOCK_MIN_W = 280;
+const dockMaxW = () => Math.max(DOCK_MIN_W, Math.round(window.innerWidth * 0.75));
+const clampDockW = (w) => Math.round(Math.min(dockMaxW(), Math.max(DOCK_MIN_W, w)));
+
+/** Resizable preview panel pinned to the right of the Settings and Images steps. Drag its left edge to resize. */
 function meetingDock() {
   const sc = state.meeting;
   if (!sc.dock) {
-    return h("button", { type: "button", class: "meeting-dock-tab", onclick: () => { sc.dock = true; renderMain(); } }, "Show meeting preview");
+    return h("button", { type: "button", class: "meeting-dock-tab", onclick: () => { sc.dock = true; saveDockPrefs(); renderMain(); } }, "Show meeting preview");
   }
-  return h("aside", { class: `meeting-dock ${sc.big ? "big" : ""}`, "aria-label": "Meeting preview" },
+  sc.dockW = clampDockW(sc.dockW);
+  const setWidth = (w) => {
+    sc.dockW = clampDockW(w);
+    document.documentElement.style.setProperty("--dock-w", `${sc.dockW}px`);
+    handle.setAttribute("aria-valuenow", String(sc.dockW));
+  };
+  const handle = h("div", {
+    class: "meeting-dock-resize", role: "separator", tabindex: 0, "aria-orientation": "vertical",
+    "aria-label": "Resize meeting preview", "aria-valuemin": DOCK_MIN_W, "aria-valuemax": dockMaxW(),
+    title: "Drag to resize (double-click to toggle wide)",
+    onpointerdown: (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = sc.dockW;
+      handle.setPointerCapture(e.pointerId);
+      document.body.classList.add("resizing-dock");
+      const move = (ev) => setWidth(startW + (startX - ev.clientX));
+      const up = () => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", up);
+        document.body.classList.remove("resizing-dock");
+        saveDockPrefs();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", up);
+    },
+    ondblclick: () => { setWidth(sc.dockW < window.innerWidth * 0.5 ? window.innerWidth * 0.6 : 480); saveDockPrefs(); },
+    onkeydown: (e) => {
+      const step = e.shiftKey ? 120 : 40;
+      const next = { ArrowLeft: sc.dockW + step, ArrowRight: sc.dockW - step, Home: dockMaxW(), End: DOCK_MIN_W }[e.key];
+      if (next === undefined) return;
+      e.preventDefault();
+      setWidth(next);
+      saveDockPrefs();
+    },
+  });
+  const dock = h("aside", { class: "meeting-dock", "aria-label": "Meeting preview" },
+    handle,
     h("div", { class: "meeting-dock-head" },
       h("strong", {}, "Meeting preview"),
       h("span", { class: "muted small" }, "approximate"),
       h("span", { class: "spacer" }),
-      h("button", { type: "button", class: `btn subtle small-btn ${sc.controls ? "active" : ""}`, "aria-expanded": String(sc.controls), onclick: () => { sc.controls = !sc.controls; renderMain(); } }, "Scenario"),
-      h("button", { type: "button", class: "icon-btn", title: sc.big ? "Smaller" : "Bigger", onclick: () => { sc.big = !sc.big; renderMain(); } }, sc.big ? "–" : "+"),
-      h("button", { type: "button", class: "icon-btn", title: "Hide preview", onclick: () => { sc.dock = false; renderMain(); } }, "✕")),
-    sc.controls ? meetingControls() : null,
-    meetingPreview(sc.big ? 0.3 : 0.2));
+      h("button", { type: "button", class: `btn subtle small-btn ${sc.controls ? "active" : ""}`, "aria-expanded": String(sc.controls), onclick: () => { sc.controls = !sc.controls; saveDockPrefs(); renderMain(); } }, "Scenario"),
+      h("button", { type: "button", class: "icon-btn", title: "Hide preview", onclick: () => { sc.dock = false; saveDockPrefs(); renderMain(); } }, "✕")),
+    meetingPreview("fit"),
+    sc.controls ? meetingControls() : null);
+  setWidth(sc.dockW);
+  return dock;
 }
 
 // Custom layouts
